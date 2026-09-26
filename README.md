@@ -24,7 +24,7 @@ The agent drills down in three levels: module (`map`) -> symbol (`show`) -> sour
 | `figure show <symbol>` | One item or module: doc, signature, fields, methods, relations, who wires and uses it. `--body` prints its exact source. |
 | `figure howto [topic]` | Lists `# How to ...` recipes, or prints one with every link resolved to `file:line`. |
 | `figure deps <path>` | What a module depends on (tree with file counts and symbols); `--reverse` for who uses it, with `file:line`. |
-| `figure check [path]` | Files without a module doc, undocumented public items, broken doc links. `--strict` exits 1 on any. |
+| `figure check [path]` | Files without a module doc, undocumented public items, broken doc links. `--strict` exits 1 on any. `--changed [REF]` checks only what changed since a git revision (default `HEAD`). |
 
 `<path>` is a directory, a `.rs` file, or a module path (`crate::traps`, `traps::shared`).
 `<symbol>` is `Harm`, `Harm::new`, `traps::register` or `crate::traps::register`.
@@ -84,6 +84,66 @@ checked by `figure check`. In recipes a bare name must resolve inside the crate.
 
 Recipes that span several modules can live in `.figure/howto/<topic>.md`, where
 `[[src/app.rs]]` links a file and `[[howto:add a trap]]` another recipe.
+
+## Run it automatically
+
+`figure check --changed` checks only what changed since a git revision (default `HEAD`,
+including staged, unstaged and untracked files): new files need a `//!` line, and public
+items that are new or whose signature changed need a `///` line. Existing gaps are not
+reported, so you can turn it on in an old codebase today and document the backlog later.
+With `--strict` it exits 1 when anything is missing, which makes it a gate:
+
+```
+$ figure check --changed --strict
+since HEAD    2 files changed (1 new)
+module docs   0 of 1 new files
+  missing: src/extra.rs
+public items  1 of 3 new or changed documented
+  missing: src/extra.rs:1 struct Extra
+           src/lib.rs:8 fn fresh
+...
+```
+
+Pick where it runs:
+
+**On every commit** (git pre-commit hook):
+
+```sh
+printf '#!/bin/sh\nexec figure check --changed --strict\n' > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**On every `cargo test`**, like any other test (needs `figure` on `PATH`):
+
+```rust
+// tests/docs.rs
+/// New or changed public API is documented.
+#[test]
+fn new_api_documented() {
+    let out = std::process::Command::new("figure")
+        .args(["check", "--changed", "--strict"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("figure is installed");
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stdout));
+}
+```
+
+**Before an AI agent finishes** (Claude Code `Stop` hook in `.claude/settings.json`): exit
+code 2 sends the report back to the agent, which documents the items before it stops.
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "figure check --changed --strict 1>&2 || exit 2" }] }
+    ]
+  }
+}
+```
+
+**In CI**, against the branch the PR targets: `figure check --changed origin/main --strict`
+(fetch enough history for that revision to exist).
 
 ## figure.toml (optional)
 

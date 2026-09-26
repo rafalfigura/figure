@@ -2,6 +2,7 @@
 //!
 //! Each command finds the crate, parses its sources live, prints plain text and exits.
 
+mod changes;
 mod commands;
 mod docs;
 mod graph;
@@ -80,6 +81,10 @@ enum Command {
         /// Exit with status 1 when anything is found.
         #[arg(long)]
         strict: bool,
+        /// Only check what changed since a git revision (default HEAD): new files need a
+        /// module doc, new or re-signed public items need a doc.
+        #[arg(long, value_name = "REF", num_args = 0..=1, default_missing_value = "HEAD")]
+        changed: Option<String>,
     },
 }
 
@@ -139,12 +144,19 @@ fn run(cli: Cli) -> Result<(String, u8), String> {
             let scope = scope(&index, &path)?;
             (commands::deps::run(&index, &scope, depth, reverse), 0)
         }
-        Command::Check { path, strict } => {
+        Command::Check {
+            path,
+            strict,
+            changed,
+        } => {
             let scope = match path {
                 Some(p) => scope(&index, &p)?,
                 None => Vec::new(),
             };
-            let report = commands::check::run(&index, &scope);
+            let changes = changed
+                .map(|base| changes::since(&index, &base))
+                .transpose()?;
+            let report = commands::check::run(&index, &scope, changes.as_ref());
             (report.text, u8::from(strict && report.findings))
         }
     })

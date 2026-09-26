@@ -1,5 +1,9 @@
-//! `figure check [path] [--strict]`: documentation gaps and broken links.
+//! `figure check [path] [--strict] [--changed [REF]]`: documentation gaps and broken links,
+//! for the whole crate or only for what changed since a git revision.
 
+use std::path::Path;
+
+use crate::changes::ChangeSet;
 use crate::commands::howto;
 use crate::commands::links::{Resolved, resolve_link};
 use crate::docs::{self, Link};
@@ -14,12 +18,35 @@ pub struct Report {
     pub findings: bool,
 }
 
-/// Checks module docs, public item docs and doc links under `scope`.
-pub fn run(index: &Index, scope: &ModPath) -> Report {
+/// Checks module docs, public item docs and doc links under `scope`. With `changes`, only
+/// changed files are checked: module docs on new files, docs on new or re-signed public
+/// items, and every link in those files.
+pub fn run(index: &Index, scope: &ModPath, changes: Option<&ChangeSet>) -> Report {
     let mut out = Out::default();
-    let files: Vec<_> = index.files_in(scope).collect();
+    let files: Vec<_> = index
+        .files_in(scope)
+        .filter(|(_, f)| changes.is_none_or(|c| c.files.contains_key(&f.path)))
+        .collect();
+    if let Some(c) = changes {
+        let (changed, new) = c.counts();
+        if changed == 0 {
+            out.field(&format!("since {}", c.base), "no source files changed");
+            return Report {
+                text: out.finish(),
+                findings: false,
+            };
+        }
+        out.field(
+            &format!("since {}", c.base),
+            format!("{} changed ({new} new)", count(changed, "file")),
+        );
+    }
+    let needs_module_doc: Vec<_> = files
+        .iter()
+        .filter(|(_, f)| changes.is_none_or(|c| c.is_new_file(&f.path)))
+        .collect();
 
-    let no_module_doc: Vec<String> = files
+    let no_module_doc: Vec<String> = needs_module_doc
         .iter()
         .filter(|(_, f)| docs::summary(&f.module_doc).is_none())
         .map(|(_, f)| slash(&f.path))
@@ -27,9 +54,14 @@ pub fn run(index: &Index, scope: &ModPath) -> Report {
     out.field(
         "module docs",
         format!(
-            "{} of {} files",
-            files.len() - no_module_doc.len(),
-            files.len()
+            "{} of {} {}",
+            needs_module_doc.len() - no_module_doc.len(),
+            needs_module_doc.len(),
+            if changes.is_some() {
+                "new files"
+            } else {
+                "files"
+            }
         ),
     );
     list(&mut out, "missing", &no_module_doc);
@@ -39,6 +71,7 @@ pub fn run(index: &Index, scope: &ModPath) -> Report {
         .flat_map(|(_, f)| {
             f.visible_items()
                 .filter(|i| i.vis >= Vis::Restricted && i.kind != ItemKind::Use)
+                .filter(move |i| changes.is_none_or(|c| c.is_new_or_changed(&f.path, i)))
                 .map(move |i| {
                     let name = format!(
                         "{}:{} {} {}",
@@ -59,9 +92,14 @@ pub fn run(index: &Index, scope: &ModPath) -> Report {
     out.field(
         "public items",
         format!(
-            "{} of {} documented",
+            "{} of {} {}documented",
             public.len() - undocumented.len(),
-            public.len()
+            public.len(),
+            if changes.is_some() {
+                "new or changed "
+            } else {
+                ""
+            }
         ),
     );
     list(&mut out, "missing", &undocumented);
@@ -115,7 +153,12 @@ pub fn run(index: &Index, scope: &ModPath) -> Report {
         }
     }
     if scope.is_empty() {
-        for recipe in recipes.iter().filter(|r| r.file.is_none()) {
+        let md_in_scope =
+            |source: &str| changes.is_none_or(|c| c.paths.contains(Path::new(source)));
+        for recipe in recipes
+            .iter()
+            .filter(|r| r.file.is_none() && md_in_scope(&r.source))
+        {
             for line in &recipe.lines {
                 for link in docs::links(line) {
                     let res = resolve_link(index, None, &link, &topics, true);
@@ -167,6 +210,13 @@ pub fn run(index: &Index, scope: &ModPath) -> Report {
         || !undocumented.is_empty()
         || !broken.is_empty()
         || !syntax.is_empty();
+    if findings && changes.is_some() {
+        out.blank();
+        out.line(
+            "Document each item above with a `///` line saying what it does, and each new file",
+        );
+        out.line("with a `//!` line saying what it is; then run figure check --changed again.");
+    }
     Report {
         text: out.finish(),
         findings,

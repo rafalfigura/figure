@@ -160,3 +160,74 @@ fn works_without_config() {
     );
     fs::remove_dir_all(dir).unwrap();
 }
+
+/// Runs git in `dir` with a throwaway identity.
+fn git(dir: &Path, args: &[&str]) {
+    let ok = Command::new("git")
+        .args([
+            "-c",
+            "user.name=figure",
+            "-c",
+            "user.email=figure@example.com",
+        ])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .expect("git runs")
+        .status
+        .success();
+    assert!(ok, "git {}", args.join(" "));
+}
+
+/// `--changed` reports only new or re-signed public items and new files; old gaps are ignored.
+#[test]
+fn changed_checks_only_new_api() {
+    let old = "//! Shapes.\n\npub fn legacy() {}\n\n/// Area.\npub fn area(r: f32) -> f32 { r }\n";
+    let dir = temp_crate("changed", &[("src/lib.rs", old)]);
+    git(&dir, &["init", "-q"]);
+    git(&dir, &["add", "."]);
+    git(&dir, &["commit", "-q", "-m", "base"]);
+
+    let clean = figure(&dir, &["check", "--changed", "--strict"]);
+    assert_eq!(clean.status.code(), Some(0), "{}", stdout(&clean));
+    assert!(stdout(&clean).contains("no source files changed"));
+
+    let edited =
+        old.replace("area(r: f32)", "area(r: f64)") + "pub mod extra;\npub fn fresh() {}\n";
+    fs::write(dir.join("src/lib.rs"), edited).unwrap();
+    fs::write(dir.join("src/extra.rs"), "pub struct Extra;\n").unwrap();
+    let out = figure(&dir, &["check", "--changed", "--strict"]);
+    let text = stdout(&out);
+    assert_eq!(out.status.code(), Some(1), "{text}");
+    assert!(text.contains("2 files changed (1 new)"), "{text}");
+    assert!(text.contains("missing: src/extra.rs"), "{text}");
+    assert!(text.contains("src/lib.rs:8 fn fresh"), "{text}");
+    assert!(text.contains("src/extra.rs:1 struct Extra"), "{text}");
+    assert!(text.contains("1 of 3 new or changed documented"), "{text}");
+    assert!(
+        !text.contains("legacy"),
+        "old gaps are not reported: {text}"
+    );
+
+    git(&dir, &["add", "."]);
+    git(&dir, &["commit", "-q", "-m", "more"]);
+    let against_first = figure(&dir, &["check", "--changed", "HEAD~1"]);
+    assert!(
+        stdout(&against_first).contains("since HEAD~1"),
+        "{}",
+        stdout(&against_first)
+    );
+    fs::remove_dir_all(dir).unwrap();
+}
+
+/// `--changed` outside a git repository, or with an unknown revision, is a usage error.
+#[test]
+fn changed_needs_git() {
+    let dir = temp_crate("nogit", &[("src/lib.rs", "//! X.\n")]);
+    let out = figure(&dir, &["check", "--changed"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("git"));
+    fs::remove_dir_all(dir).unwrap();
+    let bad = figure(&example(), &["check", "--changed", "no-such-ref"]);
+    assert_eq!(bad.status.code(), Some(2));
+}

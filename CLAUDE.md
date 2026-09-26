@@ -16,6 +16,7 @@ cargo run -q -- show <symbol>      # one item; --body for its source
 cargo test                                  # unit, CLI and golden tests
 FIGURE_BLESS=1 cargo test --test golden     # regenerate examples/rust/expected, then review the diff
 cargo run -q -- check --strict              # must stay clean: every file and pub item documented
+cargo run -q -- check --changed --strict    # only what this change added
 cargo fmt && cargo clippy --all-targets     # no warnings
 ```
 
