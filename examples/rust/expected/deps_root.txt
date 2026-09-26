@@ -1,0 +1,9 @@
+crate  (10 files)   fan-out 0 · fan-in 0
+├── app       fan-out 1 · fan-in 1
+│     -> traps 1
+├── core      fan-out 0 · fan-in 1
+├── registry  fan-out 0 · fan-in 1
+└── traps     fan-out 2 · fan-in 1
+      -> core 2 · registry 2
+
+external    bevy 9 · serde 3 · (tests) serde_yaml

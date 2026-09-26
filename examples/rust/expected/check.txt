@@ -1,0 +1,15 @@
+module docs   9 of 10 files
+  missing: src/registry.rs
+public items  11 of 19 documented
+  missing: src/registry.rs:6 struct ComponentRegistry
+           src/registry.rs:16 fn ComponentRegistry::len
+           src/traps/mod.rs:31 struct TrapsPlugin
+           src/traps/saw.rs:8 fn plugin
+           src/traps/shared/fx.rs:5 fn burst
+           src/traps/shared/hazard.rs:18 fn Harm::push
+           src/traps/shared/mod.rs:10 fn plugin
+           src/traps/spikes.rs:12 fn plugin
+tests         2 of 3 with a doc line
+links         11 checked, 0 broken
+recipes       add a trap (src/traps/mod.rs:6) · add a level (.figure/howto/add-a-level.md)
+syntax errors none

@@ -1,0 +1,28 @@
+crate::traps  module · src/traps/ · 6 files
+doc
+  Traps: environmental hazards that hurt whoever steps in.
+
+  Every trap is a YAML component registered through [`register`]; its file builds the
+  look in an observer and runs the behaviour in a system.
+
+  # How to add a trap
+  1. Create `src/traps/<name>.rs` with a `pub(super) fn plugin(app: &mut App)`.
+  2. Register the component: [`register`]`::<YourTrap>(app, "YourTrap")`.
+  3. Hurt things with [`Harm`](crate::traps::shared::hazard::Harm) and [`shared::fx::burst`].
+  4. Add `<name>::plugin(app)` to [`TrapsPlugin`].
+
+  Example to copy: [`Spikes`]
+
+  # Invariants
+  - Every trap component is registered before the level loads.
+
+  # Gotchas
+  Traps never import each other; shared code goes in `shared/`.
+submodules    saw · shared · spikes
+
+ITEMS in src/traps/mod.rs
+  struct TrapsPlugin   impl Plugin · [no doc]
+  fn register<C: Component + DeserializeOwned>(app: &mut App, name: &'static str)
+      Registers a YAML component type whose spec deserializes straight into `C`.
+
+RECIPES       howto add a trap

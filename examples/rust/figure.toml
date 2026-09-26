@@ -1,0 +1,6 @@
+[[relations]]
+call = "register::<$T>"
+name = "registers"
+
+[docs]
+fact_prefixes = ["YAML"]

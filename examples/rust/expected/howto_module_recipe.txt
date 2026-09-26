@@ -1,0 +1,7 @@
+How to add a trap   (src/traps/mod.rs:6, 5 links ok)
+1. Create `src/traps/<name>.rs` with a `pub(super) fn plugin(app: &mut App)`.
+2. Register the component: register (src/traps/mod.rs:43)`::<YourTrap>(app, "YourTrap")`.
+3. Hurt things with Harm (src/traps/shared/hazard.rs:6) and shared::fx::burst (src/traps/shared/fx.rs:5).
+4. Add `<name>::plugin(app)` to TrapsPlugin (src/traps/mod.rs:31).
+
+Example to copy: Spikes (src/traps/spikes.rs:21, 41 lines)

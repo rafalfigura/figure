@@ -1,0 +1,9 @@
+module docs   3 of 3 files
+public items  4 of 7 documented
+  missing: src/traps/shared/fx.rs:5 fn burst
+           src/traps/shared/hazard.rs:18 fn Harm::push
+           src/traps/shared/mod.rs:10 fn plugin
+tests         0 of 0 with a doc line
+links         2 checked, 0 broken
+recipes       none
+syntax errors none

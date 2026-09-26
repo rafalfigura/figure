@@ -1,0 +1,7 @@
+crate::traps::shared  (3 files)   fan-out 1 · fan-in 3
+├── traps          1 file
+│     src/traps/mod.rs:36  plugin
+├── traps::saw     1 file
+│     src/traps/saw.rs:6  Harm
+└── traps::spikes  1 file
+      src/traps/spikes.rs:6  Harm, Harmed, burst

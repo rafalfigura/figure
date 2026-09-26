@@ -1,0 +1,15 @@
+MODULE        crate::core   src/core.rs  1 file · 16 lines · rust
+PURPOSE       Game-wide state shared by every system.
+
+PUBLIC API
+## core.rs
+  fn gameplay_running(state: Res<State<Phase>>) -> bool
+      True while the player is in control (not paused, not in a menu).
+  enum Phase   state
+      Which screen the game is on.
+
+DEPENDENCIES
+  external  bevy 1
+  used by   traps
+
+UNDOCUMENTED  none (2 public items)

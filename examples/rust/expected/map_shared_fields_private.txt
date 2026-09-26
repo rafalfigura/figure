@@ -1,0 +1,39 @@
+MODULE        crate::traps::shared   src/traps/shared/  3 files · 63 lines · rust
+PURPOSE       Building blocks several traps share.
+SHAPE         flat: 2 parts, no imports between them
+
+TREE
+  fx      Throwaway visuals: debris and sparks.
+  hazard  How traps hurt things: a [`Harm`] delivered as a [`Harmed`] event.
+
+PUBLIC API
+## fx.rs
+  fn burst(commands: &mut Commands, at: Vec3, count: usize, phase: &crate::core::Phase)   [no doc]
+## hazard.rs
+  struct Harm
+      Damage and knockback dealt by one hit.
+      · pub damage: f32
+      · pub knockback: f32
+      · from: Option<Vec3>
+  fn Harm::new(damage: f32) -> Self
+      A hit with no knockback.
+  fn Harm::push(mut self, from: Vec3, knockback: f32) -> Self   [no doc]
+  struct Harmed   event
+      Sent when a trap hits an entity.
+      · pub entity: Entity
+      · pub harm: Harm
+  struct TriggerPlate(pub Vec3)   component
+      A pressure plate position (tests only need it).
+## mod.rs
+  use fx::burst
+  pub(super) fn plugin(app: &mut App)   [no doc]
+
+RELATIONS  (bevy pack)
+  shared::plugin  event hazard::Harmed
+
+DEPENDENCIES
+  internal  core 1
+  external  bevy 3
+  used by   traps · traps::saw · traps::spikes
+
+UNDOCUMENTED  3 of 7 public items in this module (list: figure check src/traps/shared)

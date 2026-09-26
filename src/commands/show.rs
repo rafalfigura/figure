@@ -1,0 +1,206 @@
+//! `figure show <symbol|module> [--body]`: the L1 manifest of one item or module, and
+//! with `--body` the L2 source slice.
+
+use std::fs;
+
+use crate::docs::parse_module_doc;
+use crate::graph::Graph;
+use crate::index::{Index, slash};
+use crate::model::{FileIndex, Item, ItemKind, ModPath, mod_display};
+use crate::relations;
+use crate::render::{Out, count, item_line};
+use crate::resolve::Found;
+
+/// Renders an item or a module; `body` adds the item's source.
+pub fn run(index: &Index, found: &Found, body: bool) -> Result<String, String> {
+    match found {
+        Found::Module(m) if body => Err(format!(
+            "--body needs an item; {} is a module (try figure map)",
+            mod_display(m)
+        )),
+        Found::Module(m) => Ok(module(index, m)),
+        Found::Item { file, item } => {
+            let file = &index.files[*file];
+            Ok(item_manifest(index, file, &file.items[*item], body))
+        }
+    }
+}
+
+fn item_manifest(index: &Index, file: &FileIndex, item: &Item, body: bool) -> String {
+    let mut out = Out::default();
+    let mut head = vec![item.kind.keyword().to_string()];
+    head.extend(relations::labels(index, file, item));
+    out.line(format!(
+        "{}  {} · {} · {}:{}",
+        item.qualified_name(),
+        head.join(" · "),
+        mod_display(&file.module),
+        slash(&file.path),
+        item.decl_line
+    ));
+    out.field("signature", &item.signature);
+    if item.is_documented() {
+        out.line("doc");
+        for l in &item.doc {
+            out.line(format!("  {l}").trim_end().to_string());
+        }
+    } else if item.kind != ItemKind::Use {
+        out.field("doc", "[no doc]");
+    }
+    if !item.fields.is_empty() {
+        out.line(match item.kind {
+            ItemKind::Enum => "variants",
+            ItemKind::Trait => "members",
+            _ => "fields",
+        });
+        for f in &item.fields {
+            out.line(format!("  {f}"));
+        }
+    }
+    let methods: Vec<String> = index
+        .files
+        .iter()
+        .filter(|f| f.module == file.module)
+        .flat_map(|f| {
+            f.visible_items()
+                .filter(|i| i.owner.as_deref() == Some(item.name.as_str()))
+                .map(move |i| (f, i))
+        })
+        .map(|(f, i)| item_line(index, f, i))
+        .collect();
+    if !methods.is_empty() {
+        out.line("methods");
+        for m in methods {
+            out.line(format!("  {m}"));
+        }
+    }
+    let rels = relations::extract(index);
+    let owner_name = match &item.owner {
+        Some(ty) => format!("{ty}.{}", item.name),
+        None => relations::owner_name(
+            file,
+            Some(&crate::model::Owner {
+                ty: None,
+                name: item.name.clone(),
+            }),
+        ),
+    };
+    let own: Vec<String> = rels
+        .iter()
+        .filter(|r| index.files[r.file].path == file.path && r.owner == owner_name)
+        .map(|r| format!("{} {}", r.kind, r.target))
+        .collect();
+    if item.kind == ItemKind::Fn && !own.is_empty() {
+        out.field("relations", own.join(" · "));
+    }
+    let wired: Vec<String> = rels
+        .iter()
+        .filter(|r| r.target == item.name || r.target.ends_with(&format!("::{}", item.name)))
+        .map(|r| format!("{} {} {}", r.owner, r.kind, r.target))
+        .collect();
+    if !wired.is_empty() {
+        out.field("wired by", wired.join(" · "));
+    }
+    let users = users_of(index, &file.module, &item.name);
+    if !users.is_empty() {
+        out.field("used by", users.join(" · "));
+    }
+    if body {
+        out.blank();
+        out.line(format!(
+            "{}:{}-{}",
+            slash(&file.path),
+            item.start_line,
+            item.end_line
+        ));
+        let source = fs::read_to_string(index.project.root.join(&file.path)).unwrap_or_default();
+        let width = item.end_line.to_string().len();
+        for (n, l) in source
+            .lines()
+            .enumerate()
+            .skip(item.start_line - 1)
+            .take(item.end_line + 1 - item.start_line)
+        {
+            out.line(format!("{:>width$}  {l}", n + 1).trim_end().to_string());
+        }
+    }
+    out.finish()
+}
+
+/// `file:line` of every reference to `module::name` from other files.
+fn users_of(index: &Index, module: &ModPath, name: &str) -> Vec<String> {
+    let graph = Graph::build(index);
+    let mut by_file: std::collections::BTreeMap<usize, Vec<usize>> = Default::default();
+    for e in graph
+        .edges
+        .iter()
+        .filter(|e| e.target == *module && e.symbol.as_deref() == Some(name))
+    {
+        by_file.entry(e.from).or_default().push(e.line);
+    }
+    by_file
+        .into_iter()
+        .map(|(f, mut lines)| {
+            lines.sort_unstable();
+            lines.dedup();
+            let lines: Vec<String> = lines.iter().map(usize::to_string).collect();
+            format!("{}:{}", slash(&index.files[f].path), lines.join(","))
+        })
+        .collect()
+}
+
+fn module(index: &Index, m: &ModPath) -> String {
+    let mut out = Out::default();
+    let files = index.files_in(m).count();
+    out.line(format!(
+        "{}  module · {} · {}",
+        mod_display(m),
+        index.module_location(m),
+        count(files, "file")
+    ));
+    let Some(file) = index.root_file(m) else {
+        return out.finish();
+    };
+    if file.module_doc.is_empty() {
+        out.field("doc", "[no module doc]");
+    } else {
+        out.line("doc");
+        for l in &file.module_doc {
+            out.line(format!("  {l}").trim_end().to_string());
+        }
+    }
+    let children: Vec<&str> = index
+        .modules
+        .iter()
+        .filter(|c| c.len() == m.len() + 1 && c.starts_with(m))
+        .filter_map(|c| c.last().map(String::as_str))
+        .collect();
+    if !children.is_empty() {
+        out.field("submodules", children.join(" · "));
+    }
+    let items: Vec<&Item> = file.visible_items().collect();
+    if !items.is_empty() {
+        out.blank();
+        out.line(format!("ITEMS in {}", slash(&file.path)));
+        for item in items {
+            out.line(format!("  {}", item_line(index, file, item)));
+            for l in &item.doc {
+                out.line(format!("      {l}").trim_end().to_string());
+            }
+        }
+    }
+    let sections = parse_module_doc(&file.module_doc).sections;
+    let recipes: Vec<String> = sections.iter().filter_map(|s| s.recipe_topic()).collect();
+    if !recipes.is_empty() {
+        out.blank();
+        out.field(
+            "RECIPES",
+            recipes
+                .iter()
+                .map(|r| format!("howto {r}"))
+                .collect::<Vec<_>>()
+                .join(" · "),
+        );
+    }
+    out.finish()
+}

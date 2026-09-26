@@ -1,0 +1,62 @@
+MODULE        crate::traps   src/traps/  6 files · 199 lines · rust
+PURPOSE       Traps: environmental hazards that hurt whoever steps in.
+SHAPE         star: 2 parts -> shared/, no other sibling imports, no cycles
+
+TREE
+  saw       Saw Blade: a spinning blade running back and forth along a rail.
+  shared/   Building blocks several traps share. (3 files)
+    fx      Throwaway visuals: debris and sparks.
+    hazard  How traps hurt things: a [`Harm`] delivered as a [`Harmed`] event.
+  spikes    Pop-up Spikes: a floor plate whose spikes go down, rattle, then up on a cycle.
+
+PUBLIC API
+## mod.rs
+  struct TrapsPlugin   impl Plugin · [no doc]
+  fn register<C: Component + DeserializeOwned>(app: &mut App, name: &'static str)
+      Registers a YAML component type whose spec deserializes straight into `C`.
+## saw.rs
+  pub(super) fn plugin(app: &mut App)   [no doc]
+  struct Saw   component
+      A saw moving along its rail.
+## shared/fx.rs
+  fn burst(commands: &mut Commands, at: Vec3, count: usize, phase: &crate::core::Phase)   [no doc]
+## shared/hazard.rs
+  struct Harm
+      Damage and knockback dealt by one hit.
+  fn Harm::new(damage: f32) -> Self
+      A hit with no knockback.
+  fn Harm::push(mut self, from: Vec3, knockback: f32) -> Self   [no doc]
+  struct Harmed   event
+      Sent when a trap hits an entity.
+  struct TriggerPlate(pub Vec3)   component
+      A pressure plate position (tests only need it).
+## shared/mod.rs
+  use fx::burst
+  pub(super) fn plugin(app: &mut App)   [no doc]
+## spikes.rs
+  pub(super) fn plugin(app: &mut App)   [no doc]
+  struct Spikes   component
+      Timed floor spikes: down -> warn -> up, forever.
+      YAML: { type: Spikes, down: 2.0, up: 1.0, damage: 12 }
+  test-only: TriggerPlate (shared::hazard::TriggerPlate)
+
+RELATIONS  (bevy pack)
+  TrapsPlugin.build  resource ComponentRegistry · plugin shared::plugin · plugin spikes::plugin · plugin saw::plugin
+  saw::plugin        registers Saw · system spin (Update)
+  shared::plugin     event hazard::Harmed
+  spikes::plugin     registers Spikes · observer build · system run.run_if(gameplay_running) (Update)
+
+DEPENDENCIES
+  internal  core 2 · registry 2
+  external  bevy 6 · serde 3 · (tests) serde_yaml
+  used by   app
+
+CONTRACTS  (invariants and tests)
+  invariant  Every trap component is registered before the level loads.
+  components_registered  Every trap component is registered.
+  specs_parse            Specs in the test data parse.
+  (+ 1 test without a doc line)
+
+DOC SECTIONS  Gotchas   (figure show crate::traps)
+RECIPES       howto add a trap
+UNDOCUMENTED  6 of 13 public items in this module (list: figure check src/traps)

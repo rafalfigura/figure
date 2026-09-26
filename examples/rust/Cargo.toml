@@ -1,0 +1,12 @@
+# Fixture for figure's golden tests. It is parsed, never built.
+[package]
+name = "arcade"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.19"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_yaml = "0.9"

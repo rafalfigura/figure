@@ -1,0 +1,12 @@
+Harm  struct · crate::traps::shared::hazard · src/traps/shared/hazard.rs:6
+signature     struct Harm
+doc
+  Damage and knockback dealt by one hit.
+fields
+  pub damage: f32
+  pub knockback: f32
+  from: Option<Vec3>
+methods
+  fn Harm::new(damage: f32) -> Self
+  fn Harm::push(mut self, from: Vec3, knockback: f32) -> Self   [no doc]
+used by       src/traps/saw.rs:6,22 · src/traps/spikes.rs:6,38

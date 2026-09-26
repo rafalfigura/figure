@@ -1,0 +1,11 @@
+Spikes  struct · component · crate::traps::spikes · src/traps/spikes.rs:21
+signature     struct Spikes
+doc
+  Timed floor spikes: down -> warn -> up, forever.
+  YAML: { type: Spikes, down: 2.0, up: 1.0, damage: 12 }
+fields
+  down: f32
+  up: f32
+  damage: f32
+  t: f32
+wired by      spikes::plugin registers Spikes

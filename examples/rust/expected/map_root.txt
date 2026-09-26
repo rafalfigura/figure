@@ -1,0 +1,47 @@
+MODULE        crate   src/  10 files · 254 lines · rust
+PURPOSE       Arcade: a tiny game used as figure's test fixture.
+SHAPE         layered: 3 sibling imports, no cycles
+
+TREE
+  app       Builds the Bevy app and adds every plugin.
+  core      Game-wide state shared by every system.
+  registry  [no module doc]
+  traps/    Traps: environmental hazards that hurt whoever steps in. (6 files)
+
+PUBLIC API
+## app.rs
+  fn run()
+      Starts the game.
+## core.rs
+  fn gameplay_running(state: Res<State<Phase>>) -> bool
+      True while the player is in control (not paused, not in a menu).
+  enum Phase   state
+      Which screen the game is on.
+## registry.rs
+  struct ComponentRegistry   resource · [no doc]
+  fn ComponentRegistry::register_typed<C: Component>(&mut self, name: &'static str)
+      Maps a YAML component name to the typed component `C`.
+  fn ComponentRegistry::len(&self) -> usize   [no doc]
+## traps/mod.rs
+  struct TrapsPlugin   impl Plugin · [no doc]
+  fn register<C: Component + DeserializeOwned>(app: &mut App, name: &'static str)
+      Registers a YAML component type whose spec deserializes straight into `C`.
+  test-only: TriggerPlate (shared::hazard::TriggerPlate)
+
+RELATIONS  (bevy pack)
+  app::run           plugin TrapsPlugin
+  TrapsPlugin.build  resource ComponentRegistry · plugin shared::plugin · plugin spikes::plugin · plugin saw::plugin
+  saw::plugin        registers Saw · system spin (Update)
+  shared::plugin     event hazard::Harmed
+  spikes::plugin     registers Spikes · observer build · system run.run_if(gameplay_running) (Update)
+
+DEPENDENCIES
+  external  bevy 9 · serde 3 · (tests) serde_yaml
+
+CONTRACTS  (invariants and tests)
+  components_registered  Every trap component is registered.
+  specs_parse            Specs in the test data parse.
+  (+ 1 test without a doc line)
+
+RECIPES       howto add a trap
+UNDOCUMENTED  8 of 19 public items in this module (list: figure check src)

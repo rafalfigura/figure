@@ -1,0 +1,5 @@
+crate::traps  (6 files)   fan-out 2 · fan-in 1
+├── core      2 files   *, Phase
+└── registry  2 files   ComponentRegistry
+
+external    bevy 6 · serde 3 · (tests) serde_yaml
