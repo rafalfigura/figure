@@ -13,8 +13,10 @@ pub mod mcp;
 mod pattern;
 mod shell;
 
+use std::collections::BTreeSet;
+use std::fs;
 use std::io::{self, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
@@ -53,8 +55,9 @@ pub fn run(hook: Hook) -> (u8, String) {
     }
 }
 
-/// `figure check --changed --strict` for the agent about to stop. Lets it stop the second
-/// time (`stop_hook_active`), so a gap it cannot fix never traps it.
+/// `figure check --changed --strict` for the agent about to stop, on the files this session
+/// touched: work left uncommitted before it started is not its to document. Lets it stop the
+/// second time (`stop_hook_active`), so a gap it cannot fix never traps it.
 fn stop(input: &Value) -> Option<String> {
     if input["stop_hook_active"].as_bool() == Some(true) {
         return None;
@@ -63,8 +66,15 @@ fn stop(input: &Value) -> Option<String> {
         .as_str()
         .map(PathBuf::from)
         .or_else(|| std::env::current_dir().ok())?;
-    let index = Index::build(project::load(&project::find_root(&cwd)?).ok()?).ok()?;
-    let changes = changes::since(&index, "HEAD").ok()?;
+    let root = project::find_root(&cwd)?;
+    let session = Session::read(Path::new(input["transcript_path"].as_str()?))?;
+    let index = Index::build(project::load(&root).ok()?).ok()?;
+    let mut changes = changes::since(&index, "HEAD").ok()?;
+    changes.paths.retain(|p| session.touched(&root, p));
+    changes.files.retain(|p, _| session.touched(&root, p));
+    if changes.paths.is_empty() {
+        return None;
+    }
     let report = commands::check::run(&index, &Vec::new(), Some(&changes));
     report.findings.then(|| {
         format!(
@@ -73,4 +83,53 @@ fn stop(input: &Value) -> Option<String> {
             report.text
         )
     })
+}
+
+/// What a session wrote, from its Claude Code transcript.
+struct Session {
+    /// `file_path` of every Edit, MultiEdit, Write and NotebookEdit call.
+    edited: BTreeSet<PathBuf>,
+    /// Every Bash command, joined: scripted edits name the files they write.
+    commands: String,
+}
+
+impl Session {
+    fn read(transcript: &Path) -> Option<Session> {
+        let text = fs::read_to_string(transcript).ok()?;
+        let mut session = Session {
+            edited: BTreeSet::new(),
+            commands: String::new(),
+        };
+        for record in text
+            .lines()
+            .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        {
+            let Some(content) = record["message"]["content"].as_array() else {
+                continue;
+            };
+            for tool in content.iter().filter(|c| c["type"] == "tool_use") {
+                let input = &tool["input"];
+                match tool["name"].as_str().unwrap_or_default() {
+                    "Edit" | "MultiEdit" | "Write" | "NotebookEdit" => {
+                        session
+                            .edited
+                            .extend(input["file_path"].as_str().map(PathBuf::from));
+                    }
+                    "Bash" => {
+                        session
+                            .commands
+                            .push_str(input["command"].as_str().unwrap_or_default());
+                        session.commands.push('\n');
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Some(session)
+    }
+
+    /// True when `rel` (relative to `root`) was edited, or named by a shell command.
+    fn touched(&self, root: &Path, rel: &Path) -> bool {
+        self.edited.contains(&root.join(rel)) || self.commands.contains(&*rel.to_string_lossy())
+    }
 }

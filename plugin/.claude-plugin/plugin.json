@@ -1,0 +1,12 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "figure",
+  "version": "0.1.0",
+  "description": "Explore Rust crates top down with figure: map, deps, show and howto as tools, raw source reads steered to them, and new public API documented before the agent stops.",
+  "author": {
+    "name": "Rafał Figura"
+  },
+  "repository": "https://github.com/rafalfigura/figure",
+  "license": "MIT",
+  "keywords": ["rust", "code-map", "navigation", "documentation"]
+}

@@ -193,14 +193,65 @@ fn stop_hook_blocks_once() {
         "//! Lib.\npub mod big;\npub fn fresh() {}\n",
     )
     .unwrap();
-    let stop = |active: bool| {
-        let payload = json!({ "cwd": dir, "stop_hook_active": active }).to_string();
-        piped(&dir, &["hook", "stop"], &payload)
+    let lib = dir.canonicalize().unwrap().join("src/lib.rs");
+    let stop = |active: bool, tool: Value| {
+        let record = json!({ "type": "assistant", "message": { "content": [tool] } });
+        let transcript = dir.join("transcript.jsonl");
+        fs::write(&transcript, format!("{record}\n")).unwrap();
+        let payload =
+            json!({ "cwd": dir, "stop_hook_active": active, "transcript_path": transcript });
+        piped(&dir, &["hook", "stop"], &payload.to_string())
     };
-    let (code, _, err) = stop(false);
+    let wrote = json!({ "type": "tool_use", "name": "Write", "input": { "file_path": lib } });
+    let (code, _, err) = stop(false, wrote.clone());
     assert_eq!(code, 2);
     assert!(err.contains("fn fresh"), "{err}");
-    assert_eq!(stop(true).0, 0);
+    assert_eq!(stop(true, wrote).0, 0);
+    let scripted = json!({ "type": "tool_use", "name": "Bash", "input": { "command": "sed -i 's/x/y/' src/lib.rs" } });
+    assert_eq!(
+        stop(false, scripted).0,
+        2,
+        "a file a shell command named counts as touched"
+    );
+}
+
+/// Uncommitted work from before the session is not the session's to document.
+#[test]
+fn stop_hook_ignores_untouched_files() {
+    let dir = big_crate("untouched");
+    for args in [
+        &["init", "-q"][..],
+        &["add", "."],
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            "base",
+        ],
+    ] {
+        assert!(
+            Command::new("git")
+                .args(args)
+                .current_dir(&dir)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    fs::write(
+        dir.join("src/lib.rs"),
+        "//! Lib.\npub mod big;\npub fn fresh() {}\n",
+    )
+    .unwrap();
+    let transcript = dir.join("transcript.jsonl");
+    let read = json!({ "type": "assistant", "message": { "content": [{ "type": "tool_use", "name": "Read", "input": { "file_path": "src/big.rs" } }] } });
+    fs::write(&transcript, format!("{read}\n")).unwrap();
+    let payload = json!({ "cwd": dir, "stop_hook_active": false, "transcript_path": transcript });
+    assert_eq!(piped(&dir, &["hook", "stop"], &payload.to_string()).0, 0);
 }
 
 /// One MCP session: handshake with instructions, five read-only tools, a call that returns

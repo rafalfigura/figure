@@ -18,6 +18,8 @@ FIGURE_BLESS=1 cargo test --test golden     # regenerate examples/rust/expected,
 cargo run -q -- check --strict              # must stay clean: every file and pub item documented
 cargo run -q -- check --changed --strict    # only what this change added
 cargo fmt && cargo clippy --all-targets     # no warnings
+claude plugin validate --strict plugin      # the Claude Code plugin (plugin/, .claude-plugin/)
+scripts/usage.py <project>                  # how agents read code there: figure calls vs raw reads
 ```
 
 ## Rules

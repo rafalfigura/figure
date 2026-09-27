@@ -27,6 +27,8 @@ is through the contract first.
 | `figure howto [topic]` | Lists `# How to ...` recipes, or prints one with every link resolved to `file:line`. |
 | `figure deps <path>` | What a module depends on (tree with file counts and symbols); `--reverse` for who uses it, with `file:line`. |
 | `figure check [path]` | Files without a module doc, undocumented public items, broken doc links. `--strict` exits 1 on any. `--changed [REF]` checks only what changed since a git revision (default `HEAD`). |
+| `figure mcp` | Serves `map`, `deps`, `show`, `howto` and `check` as MCP tools on stdin/stdout (see [For agents](#for-agents)). |
+| `figure hook guard\|stop` | Answers a Claude Code hook: JSON on stdin, exit 2 with a message to block (see [For agents](#for-agents)). |
 
 `<path>` is a directory, a `.rs` file, or a module path (`crate::traps`, `traps::shared`).
 `<symbol>` is `Harm`, `Harm::new`, `traps::register` or `crate::traps::register`.
@@ -131,18 +133,9 @@ fn new_api_documented() {
 }
 ```
 
-**Before an AI agent finishes** (Claude Code `Stop` hook in `.claude/settings.json`): exit
-code 2 sends the report back to the agent, which documents the items before it stops.
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      { "hooks": [{ "type": "command", "command": "figure check --changed --strict 1>&2 || exit 2" }] }
-    ]
-  }
-}
-```
+**Before an AI agent finishes**: the Claude Code plugin (see [For agents](#for-agents)) runs
+`figure hook stop`, which blocks the agent once while files it touched in this session have
+undocumented new API. Work left uncommitted before the session is not its to document.
 
 **In CI**, against the branch the PR targets: `figure check --changed origin/main --strict`
 (fetch enough history for that revision to exist).
@@ -166,7 +159,36 @@ labels such as `component`) switches on when `bevy` is a dependency in `Cargo.to
 
 ## For agents
 
-Put this in the project's `CLAUDE.md` / `AGENTS.md`:
+### Claude Code: install the plugin
+
+```sh
+cargo install --path .                                 # the hooks and the MCP server run `figure`
+claude plugin marketplace add rafalfigura/figure       # or a local checkout: /path/to/figure
+claude plugin install figure@figure                    # --scope project|local for one project
+```
+
+The plugin (in `plugin/`) adds, with no per-project setup:
+
+- **MCP tools** `map`, `deps`, `show`, `howto`, `check`. Agents prefer a dedicated tool to a
+  shell command, and the server's instructions, which Claude Code puts in the system prompt,
+  give the reading order below.
+- **`figure hook guard`** before every `Read`, `Grep` and `Bash` call. It blocks raw reads of
+  the crate's source and says what answers the same question:
+  - a whole-file `Read` (or `cat`, `head`, `less`) of a file over 100 lines gets the file's
+    items with their lines, to Read just one;
+  - `sed -n 40,80p src/a.rs` gets the equivalent Read and the items in those lines;
+  - a grep whose pattern is only symbols figure knows (`fn spawn\|Harm::new(`) gets
+    `figure show` (who uses and calls it) or `figure deps --reverse` for a module.
+
+  Everything else passes: text searches, case-insensitive greps, greps of piped output, a
+  Read with `offset`/`limit`, and every call outside a Rust crate.
+- **`figure hook stop`**, the documentation gate above.
+
+### Other agents, or no plugin
+
+MCP clients run `figure mcp` from the project directory (`{"command": "figure", "args": ["mcp"]}`).
+Agents that only have a shell get the same reading order from the project's `CLAUDE.md` /
+`AGENTS.md`:
 
 ```
 ## Exploring code: use figure, top down
@@ -177,7 +199,7 @@ level deeper only when the level above cannot answer your question.
    `figure deps <dir>` (`--reverse`): what it uses and who uses it.
    Answers: where does this live, what talks to what, what does a change touch.
 2. Contracts. `figure show <symbol>` (or a module): signature, doc, fields, methods,
-   who wires and uses it. `figure howto <topic>` before adding anything; follow the recipe.
+   who wires, uses and calls it. `figure howto <topic>` before adding anything; follow the recipe.
    Answers: what does it do, how do I call or extend it.
 3. Code. `show` names the item's lines (`src/traps/mod.rs:42-47`). Only when step 2 left a
    question the doc does not answer, or to edit it, read that range of the file, not the
@@ -191,11 +213,19 @@ level deeper only when the level above cannot answer your question.
 - After a change, run `figure check --changed`.
 ```
 
+### Measuring it
+
+`scripts/usage.py [project]` reads the project's Claude Code transcripts and counts, per
+session, figure calls against raw source reads (whole-file Reads, `cat`/`sed`/`grep` of `.rs`
+files) and guard blocks. Run it before and after a change to how agents are set up.
+
 ## Limits
 
 - Rust only for now; other languages plug in behind `LanguageAdapter` (`figure howto add a language`).
 - Resolution is syntactic: items generated by macros are invisible, and paths are resolved
-  from `use` declarations and module layout, not by the compiler.
+  from `use` declarations and module layout, not by the compiler. `called by` lists path
+  calls (`helper()`, `Type::new()`, `Self::new()`); calls through a receiver (`x.push()`)
+  need types and are not listed. Methods of trait impls are not items.
 - Files under `src/bin/` and crates of a workspace other than the one found are not indexed.
 
 ## Development

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "figure": {
+      "command": "figure",
+      "args": ["mcp"]
+    }
+  }
+}
