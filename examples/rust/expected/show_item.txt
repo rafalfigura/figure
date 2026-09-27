@@ -1,4 +1,4 @@
-Spikes  struct · component · crate::traps::spikes · src/traps/spikes.rs:21
+Spikes  struct · component · crate::traps::spikes · src/traps/spikes.rs:18-27
 signature     struct Spikes
 doc
   Timed floor spikes: down -> warn -> up, forever.

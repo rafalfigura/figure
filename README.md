@@ -16,12 +16,14 @@ cargo install --path .
 
 ## Commands
 
-The agent drills down in three levels: module (`map`) -> symbol (`show`) -> source (`show --body`).
+The agent drills down in three levels: module (`map`, `deps`) -> symbol (`show`) -> the item's
+lines, which `show` names as `file:start-end`. figure prints no source: the only way to the code
+is through the contract first.
 
 | Command | Answers |
 | --- | --- |
 | `figure map <path>` | Module manifest: purpose, shape, tree, public API, relations, dependencies, contracts, recipes, undocumented count. `--depth N`, `--fields`, `--private`. |
-| `figure show <symbol>` | One item or module: doc, signature, fields, methods, relations, who wires and uses it. `--body` prints its exact source. |
+| `figure show <symbol>` | One item or module: its `file:start-end`, doc, signature, fields, methods, relations, who wires and uses it. |
 | `figure howto [topic]` | Lists `# How to ...` recipes, or prints one with every link resolved to `file:line`. |
 | `figure deps <path>` | What a module depends on (tree with file counts and symbols); `--reverse` for who uses it, with `file:line`. |
 | `figure check [path]` | Files without a module doc, undocumented public items, broken doc links. `--strict` exits 1 on any. `--changed [REF]` checks only what changed since a git revision (default `HEAD`). |
@@ -167,14 +169,26 @@ labels such as `component`) switches on when `bevy` is a dependency in `Cargo.to
 Put this in the project's `CLAUDE.md` / `AGENTS.md`:
 
 ```
-## Exploring code: use figure first
-Before opening source files in an unfamiliar module:
-1. `figure map <dir>` for purpose, tree, public API, relations, contracts.
-2. `figure howto <topic>` if you are adding something; follow the recipe.
-3. `figure show <symbol>` for one item; `--body` for its exact source.
-4. `figure deps <dir>` (and `--reverse`) to see what else a change touches.
-Open a whole file only to edit it, or when figure output is not enough.
-After a change, run `figure check`.
+## Exploring code: use figure, top down
+figure replaces cat, sed, head and grep for reading Rust source. Work top down and go one
+level deeper only when the level above cannot answer your question.
+
+1. Connections. `figure map <dir>`: purpose, tree, shape, public API, relations.
+   `figure deps <dir>` (`--reverse`): what it uses and who uses it.
+   Answers: where does this live, what talks to what, what does a change touch.
+2. Contracts. `figure show <symbol>` (or a module): signature, doc, fields, methods,
+   who wires and uses it. `figure howto <topic>` before adding anything; follow the recipe.
+   Answers: what does it do, how do I call or extend it.
+3. Code. `show` names the item's lines (`src/traps/mod.rs:42-47`). Only when step 2 left a
+   question the doc does not answer, or to edit it, read that range of the file, not the
+   whole file.
+
+- Before each call, know the question it answers; stop when it is answered.
+- Output is complete and compact: do not pipe it through head, sed or grep.
+- Reading the code of more than ~3 items for one task means you are reading, not navigating:
+  go back to `map`, `deps` and `show`.
+- grep is for text that is not a symbol (a string literal, a log message).
+- After a change, run `figure check --changed`.
 ```
 
 ## Limits

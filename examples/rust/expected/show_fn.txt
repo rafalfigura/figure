@@ -1,0 +1,5 @@
+register  fn · crate::traps · src/traps/mod.rs:42-47
+signature     fn register<C: Component + DeserializeOwned>(app: &mut App, name: &'static str)
+doc
+  Registers a YAML component type whose spec deserializes straight into `C`.
+used by       src/traps/saw.rs:9 · src/traps/spikes.rs:13

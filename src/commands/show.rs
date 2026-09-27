@@ -1,7 +1,8 @@
-//! `figure show <symbol|module> [--body]`: the L1 manifest of one item or module, and
-//! with `--body` the L2 source slice.
-
-use std::fs;
+//! `figure show <symbol|module>`: the L1 manifest of one item or module.
+//!
+//! figure prints no source. The header names the item's whole line range (doc and
+//! attributes included), so an agent reads just those lines of the file, after it has seen
+//! the contract.
 
 use crate::docs::parse_module_doc;
 use crate::graph::Graph;
@@ -11,32 +12,29 @@ use crate::relations;
 use crate::render::{Out, count, item_line};
 use crate::resolve::Found;
 
-/// Renders an item or a module; `body` adds the item's source.
-pub fn run(index: &Index, found: &Found, body: bool) -> Result<String, String> {
+/// Renders an item or a module.
+pub fn run(index: &Index, found: &Found) -> String {
     match found {
-        Found::Module(m) if body => Err(format!(
-            "--body needs an item; {} is a module (try figure map)",
-            mod_display(m)
-        )),
-        Found::Module(m) => Ok(module(index, m)),
+        Found::Module(m) => module(index, m),
         Found::Item { file, item } => {
             let file = &index.files[*file];
-            Ok(item_manifest(index, file, &file.items[*item], body))
+            item_manifest(index, file, &file.items[*item])
         }
     }
 }
 
-fn item_manifest(index: &Index, file: &FileIndex, item: &Item, body: bool) -> String {
+fn item_manifest(index: &Index, file: &FileIndex, item: &Item) -> String {
     let mut out = Out::default();
     let mut head = vec![item.kind.keyword().to_string()];
     head.extend(relations::labels(index, file, item));
     out.line(format!(
-        "{}  {} · {} · {}:{}",
+        "{}  {} · {} · {}:{}-{}",
         item.qualified_name(),
         head.join(" · "),
         mod_display(&file.module),
         slash(&file.path),
-        item.decl_line
+        item.start_line,
+        item.end_line
     ));
     out.field("signature", &item.signature);
     if item.is_documented() {
@@ -104,25 +102,6 @@ fn item_manifest(index: &Index, file: &FileIndex, item: &Item, body: bool) -> St
     let users = users_of(index, &file.module, &item.name);
     if !users.is_empty() {
         out.field("used by", users.join(" · "));
-    }
-    if body {
-        out.blank();
-        out.line(format!(
-            "{}:{}-{}",
-            slash(&file.path),
-            item.start_line,
-            item.end_line
-        ));
-        let source = fs::read_to_string(index.project.root.join(&file.path)).unwrap_or_default();
-        let width = item.end_line.to_string().len();
-        for (n, l) in source
-            .lines()
-            .enumerate()
-            .skip(item.start_line - 1)
-            .take(item.end_line + 1 - item.start_line)
-        {
-            out.line(format!("{:>width$}  {l}", n + 1).trim_end().to_string());
-        }
     }
     out.finish()
 }

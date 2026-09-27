@@ -91,12 +91,6 @@ fn lookup_errors() {
         figure(&example(), &["map", "src/nope"]).status.code(),
         Some(2)
     );
-    assert_eq!(
-        figure(&example(), &["show", "crate::traps", "--body"])
-            .status
-            .code(),
-        Some(2)
-    );
 }
 
 /// `--root` finds the crate from any working directory; paths are then module paths.

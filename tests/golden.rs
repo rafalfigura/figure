@@ -18,7 +18,7 @@ const RUST_CASES: &[(&str, &[&str])] = &[
     ),
     ("map_depth2", &["map", "crate::traps", "--depth", "2"]),
     ("show_item", &["show", "Spikes"]),
-    ("show_body", &["show", "traps::register", "--body"]),
+    ("show_fn", &["show", "traps::register"]),
     ("show_methods_users", &["show", "Harm"]),
     ("show_method", &["show", "Harm::new"]),
     ("show_module", &["show", "crate::traps"]),

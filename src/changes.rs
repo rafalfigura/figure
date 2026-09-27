@@ -37,6 +37,7 @@ impl ChangeSet {
             .is_some_and(|f| f.new_file || f.base_items.get(&key(item)) != Some(&item.signature))
     }
 
+    /// True when `path` did not exist at the base revision.
     pub fn is_new_file(&self, path: &Path) -> bool {
         self.files.get(path).is_some_and(|f| f.new_file)
     }

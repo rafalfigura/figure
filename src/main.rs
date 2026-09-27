@@ -53,13 +53,10 @@ enum Command {
         #[arg(long)]
         private: bool,
     },
-    /// One symbol or module: doc, signature, fields, relations, users.
+    /// One symbol or module: its lines, doc, signature, fields, relations, users.
     Show {
         /// `Harm`, `Harm::new`, `traps::register`, `crate::traps`, or a path on disk.
         symbol: String,
-        /// Print the item's exact source with line numbers.
-        #[arg(long)]
-        body: bool,
     },
     /// List `# How to ...` recipes, or print one with its links checked.
     Howto {
@@ -125,12 +122,12 @@ fn run(cli: Cli) -> Result<(String, u8), String> {
             };
             (commands::map::run(&index, &scope, &opts), 0)
         }
-        Command::Show { symbol, body } => {
+        Command::Show { symbol } => {
             let found = match index.module_for_path(Path::new(&symbol)) {
                 Some(m) if Path::new(&symbol).exists() => Found::Module(m),
                 _ => pick(&index, &symbol)?,
             };
-            (commands::show::run(&index, &found, body)?, 0)
+            (commands::show::run(&index, &found), 0)
         }
         Command::Howto { topic } => {
             let topic = (!topic.is_empty()).then(|| topic.join(" "));

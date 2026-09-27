@@ -1,4 +1,4 @@
-Harm::new  fn · crate::traps::shared::hazard · src/traps/shared/hazard.rs:14
+Harm::new  fn · crate::traps::shared::hazard · src/traps/shared/hazard.rs:13-16
 signature     fn new(damage: f32) -> Self
 doc
   A hit with no knockback.
