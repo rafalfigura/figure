@@ -3,3 +3,4 @@ signature     fn register<C: Component + DeserializeOwned>(app: &mut App, name: 
 doc
   Registers a YAML component type whose spec deserializes straight into `C`.
 used by       src/traps/saw.rs:9 · src/traps/spikes.rs:13
+called by     saw::plugin src/traps/saw.rs:9 · spikes::plugin src/traps/spikes.rs:13

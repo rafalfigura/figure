@@ -23,7 +23,7 @@ is through the contract first.
 | Command | Answers |
 | --- | --- |
 | `figure map <path>` | Module manifest: purpose, shape, tree, public API, relations, dependencies, contracts, recipes, undocumented count. `--depth N`, `--fields`, `--private`. |
-| `figure show <symbol>` | One item or module: its `file:start-end`, doc, signature, fields, methods, relations, who wires and uses it. |
+| `figure show <symbol>` | One item or module: its `file:start-end`, doc, signature, fields, methods, relations, who wires, uses and calls it. |
 | `figure howto [topic]` | Lists `# How to ...` recipes, or prints one with every link resolved to `file:line`. |
 | `figure deps <path>` | What a module depends on (tree with file counts and symbols); `--reverse` for who uses it, with `file:line`. |
 | `figure check [path]` | Files without a module doc, undocumented public items, broken doc links. `--strict` exits 1 on any. `--changed [REF]` checks only what changed since a git revision (default `HEAD`). |

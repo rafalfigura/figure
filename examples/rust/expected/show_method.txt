@@ -2,3 +2,4 @@ Harm::new  fn · crate::traps::shared::hazard · src/traps/shared/hazard.rs:13-1
 signature     fn new(damage: f32) -> Self
 doc
   A hit with no knockback.
+called by     saw::spin src/traps/saw.rs:22 · hazard::debug_harm src/traps/shared/hazard.rs:38 · spikes::run src/traps/spikes.rs:38

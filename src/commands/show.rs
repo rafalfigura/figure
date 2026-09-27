@@ -7,10 +7,10 @@
 use crate::docs::parse_module_doc;
 use crate::graph::Graph;
 use crate::index::{Index, slash};
-use crate::model::{FileIndex, Item, ItemKind, ModPath, mod_display};
+use crate::model::{FileIndex, Item, ItemKind, ModPath, Owner, mod_display};
 use crate::relations;
 use crate::render::{Out, count, item_line};
-use crate::resolve::Found;
+use crate::resolve::{Found, Target, resolve};
 
 /// Renders an item or a module.
 pub fn run(index: &Index, found: &Found) -> String {
@@ -103,7 +103,105 @@ fn item_manifest(index: &Index, file: &FileIndex, item: &Item) -> String {
     if !users.is_empty() {
         out.field("used by", users.join(" · "));
     }
+    if item.kind == ItemKind::Fn {
+        let callers = callers_of(index, &file.module, item);
+        if !callers.is_empty() {
+            out.field("called by", callers.join(" · "));
+        }
+    }
     out.finish()
+}
+
+/// `caller file:line` of every path call to `item` outside tests: `register::<Saw>(..)`,
+/// `Harm::new(..)`, `Self::new(..)`, a plain `helper(..)` in the same module. Calls through
+/// a receiver (`harm.push(..)`) are not resolvable without types and are not listed.
+fn callers_of(index: &Index, module: &ModPath, item: &Item) -> Vec<String> {
+    let mut found = Vec::new();
+    for file in &index.files {
+        for call in file
+            .calls
+            .iter()
+            .filter(|c| !c.in_test && c.method.is_none())
+        {
+            let segs = callee_path(&call.callee);
+            let Some((last, before)) = segs.split_last() else {
+                continue;
+            };
+            if *last != item.name {
+                continue;
+            }
+            let local = file.module == *module;
+            let hit = match (&item.owner, before.split_last()) {
+                (Some(ty), Some((t, _))) if t == "Self" => {
+                    local && call.owner.as_ref().and_then(|o| o.ty.as_ref()) == Some(ty)
+                }
+                (Some(ty), Some((t, _))) if t == ty => {
+                    points_at(index, file, before, module, local)
+                }
+                (None, None) => {
+                    points_at(index, file, &segs, module, local)
+                        || local && is_local(index, file, &segs)
+                }
+                (None, Some(_)) => points_at(index, file, &segs, module, false),
+                _ => false,
+            };
+            if hit {
+                let caller = match &call.owner {
+                    Some(Owner { ty: Some(ty), name }) => format!("{ty}::{name}"),
+                    Some(Owner { ty: None, name }) => match file.module.last() {
+                        Some(m) => format!("{m}::{name}"),
+                        None => name.clone(),
+                    },
+                    None => "(module)".into(),
+                };
+                found.push(format!("{caller} {}:{}", slash(&file.path), call.line));
+            }
+        }
+    }
+    found.dedup();
+    found
+}
+
+/// True when `segs` resolves to `module` and the item right after it, or, for a type
+/// declared in the caller's own module (`local`), does not resolve at all.
+fn points_at(
+    index: &Index,
+    file: &FileIndex,
+    segs: &[String],
+    module: &ModPath,
+    local: bool,
+) -> bool {
+    match resolve(index, file, segs) {
+        Target::Internal { module: m, symbol } => {
+            m == *module && symbol.as_deref() == segs.last().map(String::as_str)
+        }
+        Target::Other => local && segs.len() == 1,
+        _ => false,
+    }
+}
+
+/// A one-segment call that no `use` in `file` brings in from elsewhere.
+fn is_local(index: &Index, file: &FileIndex, segs: &[String]) -> bool {
+    segs.len() == 1 && resolve(index, file, segs) == Target::Other
+}
+
+/// `super::register::<Spikes>` -> `["super", "register"]`; generic arguments dropped.
+fn callee_path(callee: &str) -> Vec<String> {
+    let mut plain = String::new();
+    let mut depth = 0usize;
+    for ch in callee.chars() {
+        match ch {
+            '<' => depth += 1,
+            '>' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => plain.push(ch),
+            _ => {}
+        }
+    }
+    plain
+        .split("::")
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// `file:line` of every reference to `module::name` from other files.
