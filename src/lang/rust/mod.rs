@@ -23,6 +23,14 @@ impl LanguageAdapter for Rust {
         &["rs"]
     }
 
+    fn keywords(&self) -> &'static [&'static str] {
+        &[
+            "pub", "crate", "fn", "struct", "enum", "trait", "impl", "mod", "use", "type", "const",
+            "static", "let", "mut", "async", "unsafe", "for", "dyn", "where", "self", "super",
+            "Self",
+        ]
+    }
+
     fn module_of(&self, rel: &Path) -> Option<ModPath> {
         if rel.extension()? != "rs" {
             return None;

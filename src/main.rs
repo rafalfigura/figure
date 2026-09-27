@@ -2,6 +2,7 @@
 //!
 //! Each command finds the crate, parses its sources live, prints plain text and exits.
 
+mod agent;
 mod changes;
 mod commands;
 mod docs;
@@ -71,6 +72,13 @@ enum Command {
         #[arg(long)]
         reverse: bool,
     },
+    /// Serve the commands as MCP tools on stdin/stdout (for agents; see the plugin in plugin/).
+    Mcp,
+    /// Answer a Claude Code hook: JSON on stdin; exit 2 with a message blocks the call.
+    Hook {
+        #[arg(value_enum)]
+        hook: agent::Hook,
+    },
     /// Files without a module doc, undocumented public items, broken doc links.
     Check {
         /// Limit the check to one module (default: the whole crate).
@@ -87,6 +95,11 @@ enum Command {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if let Command::Hook { hook } = cli.command {
+        let (code, message) = agent::run(hook);
+        eprint!("{message}");
+        return ExitCode::from(code);
+    }
     match run(cli) {
         Ok((text, code)) => {
             print!("{text}");
@@ -105,6 +118,11 @@ fn run(cli: Cli) -> Result<(String, u8), String> {
         Command::Show { symbol, .. } => Some(symbol.as_str()),
         Command::Check { path, .. } => path.as_deref(),
         Command::Howto { .. } => None,
+        Command::Mcp => {
+            agent::mcp::serve(cli.root.as_deref())?;
+            return Ok((String::new(), 0));
+        }
+        Command::Hook { .. } => return Err("figure hook runs from main".into()),
     };
     let index = open(cli.root.as_deref(), hint)?;
     Ok(match cli.command {
@@ -156,6 +174,7 @@ fn run(cli: Cli) -> Result<(String, u8), String> {
             let report = commands::check::run(&index, &scope, changes.as_ref());
             (report.text, u8::from(strict && report.findings))
         }
+        Command::Mcp | Command::Hook { .. } => unreachable!("handled before indexing"),
     })
 }
 

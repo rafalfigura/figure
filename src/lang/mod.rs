@@ -27,4 +27,15 @@ pub trait LanguageAdapter: Sync {
     fn module_of(&self, rel: &Path) -> Option<ModPath>;
     /// Parses one file. `path` and `module` are filled in by the caller.
     fn parse(&self, source: &str) -> FileIndex;
+    /// Words that can stand before a name in a code search (`fn`, `struct`, `impl`): the
+    /// agent guard skips them when it decides whether a grep pattern names a symbol.
+    fn keywords(&self) -> &'static [&'static str];
+}
+
+/// The adapter whose [`LanguageAdapter::id`] is `id`.
+pub fn adapter(id: &str) -> Option<&'static dyn LanguageAdapter> {
+    match id {
+        "rust" => Some(&rust::Rust),
+        _ => None,
+    }
 }
