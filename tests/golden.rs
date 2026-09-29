@@ -24,7 +24,6 @@ const RUST_CASES: &[(&str, &[&str])] = &[
     ("show_module", &["show", "crate::traps"]),
     ("howto_list", &["howto"]),
     ("howto_module_recipe", &["howto", "trap"]),
-    ("howto_file_recipe", &["howto", "add", "a", "level"]),
     ("deps", &["deps", "src/traps"]),
     ("deps_reverse", &["deps", "src/traps/shared", "--reverse"]),
     ("deps_root", &["deps", "src"]),

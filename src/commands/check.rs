@@ -1,7 +1,6 @@
 //! `figure check [path] [--strict] [--changed [REF]]`: documentation gaps and broken links,
 //! for the whole crate or only for what changed since a git revision.
 
-use std::path::Path;
 
 use crate::changes::ChangeSet;
 use crate::commands::howto;
@@ -152,21 +151,6 @@ pub fn run(index: &Index, scope: &ModPath, changes: Option<&ChangeSet>) -> Repor
             }
         }
     }
-    if scope.is_empty() {
-        let md_in_scope =
-            |source: &str| changes.is_none_or(|c| c.paths.contains(Path::new(source)));
-        for recipe in recipes
-            .iter()
-            .filter(|r| r.file.is_none() && md_in_scope(&r.source))
-        {
-            for line in &recipe.lines {
-                for link in docs::links(line) {
-                    let res = resolve_link(index, None, &link, &topics, true);
-                    note(res, recipe.source.clone(), &link);
-                }
-            }
-        }
-    }
     out.field(
         "links",
         format!("{checked} checked, {} broken", broken.len()),
@@ -175,11 +159,7 @@ pub fn run(index: &Index, scope: &ModPath, changes: Option<&ChangeSet>) -> Repor
 
     let in_scope: Vec<String> = recipes
         .iter()
-        .filter(|r| {
-            r.file.map_or(scope.is_empty(), |f| {
-                index.files[f].module.starts_with(scope)
-            })
-        })
+        .filter(|r| index.files[r.file].module.starts_with(scope))
         .map(|r| format!("{} ({})", r.topic, r.source))
         .collect();
     out.field(
