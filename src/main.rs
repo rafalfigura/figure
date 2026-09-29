@@ -9,7 +9,6 @@ mod commands;
 mod docs;
 mod graph;
 mod index;
-mod jsonc;
 mod lang;
 mod model;
 mod project;
@@ -190,7 +189,10 @@ fn open(root: Option<&Path>, hint: Option<&str>) -> Result<Index, String> {
             .and_then(project::find_root)
             .or_else(|| project::find_root(Path::new("."))),
     }
-    .ok_or("no Cargo.toml with a [package] or package.json found (use --root)")?;
+    .ok_or(&format!(
+        "no {} found (use --root)",
+        project::manifest_names()
+    ))?;
     Index::build(project::load(&root)?)
 }
 

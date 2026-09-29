@@ -1,6 +1,6 @@
 //! Imports as references: `import`, `export ... from`, `require()` and `import()` with a
-//! string argument. Relative specifiers become `crate::<module path>` so the language-neutral
-//! resolver can follow them; bare specifiers become the package name.
+//! string argument. Relative specifiers become module paths anchored at the source root; bare
+//! specifiers stay as written (a package name, or an alias for the resolver to expand).
 
 use tree_sitter::Node;
 
@@ -92,22 +92,24 @@ fn push(
     name: Option<String>,
 ) {
     let spec = text(literal, src).trim_matches(['"', '\'', '`']);
-    let Some(mut segments) = specifier(spec, dir) else {
+    let Some((mut segments, anchored)) = specifier(spec, dir) else {
         return;
     };
     segments.extend(name);
     out.refs.push(PathRef {
         segments,
         glob: false,
+        anchored,
         line: line(at),
         in_test: false,
         owner: None,
     });
 }
 
-/// The path segments a module specifier stands for, `None` when it points nowhere useful.
-/// `./x` in `a/b.ts` -> `crate::a::x`; `@scope/pkg/sub` -> `@scope/pkg`, `sub`.
-pub fn specifier(spec: &str, dir: &[String]) -> Option<Vec<String>> {
+/// The path segments a module specifier stands for and whether they are anchored at the source
+/// root, `None` when it points nowhere useful. `./x` in `a/b.ts` -> `a/x`, anchored;
+/// `@scope/pkg/sub` -> `@scope/pkg`, `sub`, as written.
+pub fn specifier(spec: &str, dir: &[String]) -> Option<(Vec<String>, bool)> {
     if !spec.starts_with('.') {
         let spec = spec.strip_prefix("node:").unwrap_or(spec);
         let mut parts: Vec<String> = spec
@@ -124,7 +126,7 @@ pub fn specifier(spec: &str, dir: &[String]) -> Option<Vec<String>> {
             let name = format!("{}/{}", parts[0], parts[1]);
             parts.splice(..2, [name]);
         }
-        return (!parts.is_empty()).then_some(parts);
+        return (!parts.is_empty()).then_some((parts, false));
     }
     let mut path: Vec<String> = dir.to_vec();
     for part in spec.split('/') {
@@ -136,20 +138,26 @@ pub fn specifier(spec: &str, dir: &[String]) -> Option<Vec<String>> {
             p => path.push(p.to_string()),
         }
     }
+    if path
+        .last()
+        .and_then(|l| l.rsplit_once('.'))
+        .is_some_and(|(_, ext)| ASSET_EXTENSIONS.contains(&ext))
+    {
+        return None;
+    }
+    Some((normalize(path), true))
+}
+
+/// A module path without a source extension on its last name and without a trailing `index`.
+pub fn normalize(mut path: Vec<String>) -> Vec<String> {
     if let Some(last) = path.last_mut()
         && let Some((stem, ext)) = last.rsplit_once('.')
+        && SOURCE_EXTENSIONS.contains(&ext)
     {
-        if ASSET_EXTENSIONS.contains(&ext) {
-            return None;
-        }
-        if SOURCE_EXTENSIONS.contains(&ext) {
-            *last = stem.to_string();
-        }
+        *last = stem.to_string();
     }
     if path.last().is_some_and(|l| l == "index") {
         path.pop();
     }
-    let mut segments = vec!["crate".to_string()];
-    segments.extend(path);
-    Some(segments)
+    path
 }

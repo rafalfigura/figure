@@ -82,7 +82,7 @@ fn class_members() {
     assert_eq!(f.trait_impls[0].trait_name, "Repo");
 }
 
-/// Relative imports resolve against the file's directory; bare ones name the package.
+/// Relative imports are anchored at the source root; bare ones stay as written.
 #[test]
 fn imports_become_paths() {
     let f = parse(
@@ -90,17 +90,27 @@ fn imports_become_paths() {
          import React from 'react';\nimport { x } from '@scope/pkg/deep';\nimport './style.css';\n\
          const m = require('./m');\nexport { y } from './y';\n",
     );
-    let paths: Vec<String> = f.refs.iter().map(|r| r.segments.join("::")).collect();
+    let paths: Vec<String> = f
+        .refs
+        .iter()
+        .map(|r| {
+            format!(
+                "{}{}",
+                if r.anchored { "/" } else { "" },
+                r.segments.join("::")
+            )
+        })
+        .collect();
     assert_eq!(
         paths,
         [
-            "crate::a::util",
-            "crate::a::util::b",
-            "crate::lib",
+            "/a::util",
+            "/a::util::b",
+            "/lib",
             "react",
             "@scope/pkg::deep::x",
-            "crate::a::m",
-            "crate::a::y",
+            "/a::m",
+            "/a::y",
         ]
     );
 }

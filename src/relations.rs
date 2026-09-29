@@ -33,7 +33,7 @@ pub fn extract(index: &Index) -> Vec<Relation> {
                     target,
                 });
             };
-            if index.project.bevy
+            if index.project.has_pack("bevy")
                 && let Some((kind, target)) = bevy_call(call)
             {
                 push(kind, target);
@@ -44,7 +44,7 @@ pub fn extract(index: &Index) -> Vec<Relation> {
                 }
             }
         }
-        if index.project.bevy {
+        if index.project.has_pack("bevy") {
             for r in file.refs.iter().filter(|r| !r.in_test && r.owner.is_some()) {
                 if r.segments.len() > 1 && r.segments.last().is_some_and(|s| s == "plugin") {
                     let target: Vec<&str> = r
@@ -155,7 +155,7 @@ pub fn match_pattern(pattern: &RelationPattern, call: &Call) -> Option<String> {
 /// Framework labels for an item: `component` from `#[derive(Component)]`, `impl Plugin`.
 pub fn labels(index: &Index, file: &FileIndex, item: &Item) -> Vec<String> {
     let mut out = Vec::new();
-    if index.project.bevy {
+    if index.project.has_pack("bevy") {
         for d in &item.derives {
             let label = match d.as_str() {
                 "Component" => "component",

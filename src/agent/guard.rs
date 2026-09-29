@@ -59,13 +59,13 @@ pub fn judge(input: &Value) -> Option<String> {
         .ok()?;
     let relevant = match tool {
         "Read" => {
-            is_source(args["file_path"].as_str()?)
+            lang::is_source_file(args["file_path"].as_str()?)
                 && args["offset"].is_null()
                 && args["limit"].is_null()
         }
         "Grep" => true,
         "Bash" => shell::commands(args["command"].as_str()?).iter().any(|c| {
-            let names_rs = c.args.iter().any(|a| is_source(a));
+            let names_rs = c.args.iter().any(|a| lang::is_source_file(a));
             (PAGERS.contains(&c.program.as_str()) || c.program == "sed") && names_rs
                 || GREPS.contains(&c.program.as_str()) && !c.piped
         }),
@@ -97,13 +97,6 @@ pub fn judge(input: &Value) -> Option<String> {
             .iter()
             .find_map(|c| bash(&at, c)),
     }
-}
-
-/// True when `arg` ends in the extension of a language figure reads.
-fn is_source(arg: &str) -> bool {
-    ["rs", "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"]
-        .iter()
-        .any(|e| arg.ends_with(&format!(".{e}")))
 }
 
 /// The crate and where the agent stands.
@@ -138,19 +131,13 @@ impl Place<'_> {
     /// True when `arg` is an indexed file or a directory holding some.
     /// True when a glob or option value names files of the project's language.
     fn names_language(&self, glob: &str) -> bool {
-        lang::adapter(self.index.language)
-            .is_some_and(|a| a.extensions().iter().any(|e| glob.contains(e)))
+        let adapter = self.index.adapter();
+        adapter.extensions().iter().any(|e| glob.contains(e))
     }
 
     /// True when a ripgrep `--type` covers the project's language.
     fn is_type(&self, name: &str) -> bool {
-        match self.index.language {
-            "typescript" => matches!(
-                name,
-                "ts" | "js" | "typescript" | "javascript" | "tsx" | "jsx"
-            ),
-            language => name == language,
-        }
+        self.index.adapter().grep_types().contains(&name)
     }
 
     fn covers(&self, arg: &str) -> bool {

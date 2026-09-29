@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::docs::{Link, LinkKind};
 use crate::index::{Index, slash};
 use crate::model::FileIndex;
-use crate::resolve::{Found, Target, find, is_std, module_has, resolve};
+use crate::resolve::{Found, Target, find, is_builtin, module_has, resolve};
 
 /// Where a link points, when it resolves.
 #[derive(Debug)]
@@ -75,7 +75,7 @@ fn symbol(index: &Index, file: Option<&FileIndex>, target: &str, strict: bool) -
             _ => Resolved::Broken,
         };
     }
-    if is_std(first) || index.project.externals.contains(first) {
+    if is_builtin(index, first) || index.project.externals.contains(first) {
         return Resolved::External;
     }
     if let Some(found) = at_found(index, &find(index, target)) {
