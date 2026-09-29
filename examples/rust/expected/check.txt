@@ -10,6 +10,6 @@ public items  11 of 19 documented
            src/traps/shared/mod.rs:10 fn plugin
            src/traps/spikes.rs:12 fn plugin
 tests         2 of 3 with a doc line
-links         11 checked, 0 broken
-recipes       add a trap (src/traps/mod.rs:6) · add a level (.figure/howto/add-a-level.md)
+links         8 checked, 0 broken
+recipes       add a trap (src/traps/mod.rs:6)
 syntax errors none

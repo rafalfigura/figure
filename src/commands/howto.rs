@@ -1,25 +1,23 @@
 //! `figure howto [topic]`: list recipes, or print one with its links resolved.
 
-use std::fs;
-
 use crate::commands::links::{Resolved, resolve_link};
 use crate::docs::{self, parse_module_doc};
 use crate::index::{Index, slash};
 use crate::model::FileIndex;
 use crate::render::{Out, aligned};
 
-/// A `# How to ...` section or a `.figure/howto/*.md` file.
+/// A `# How to ...` section of a module doc.
 pub struct Recipe {
     pub topic: String,
     pub title: String,
-    /// `src/traps/mod.rs:5` or `.figure/howto/x.md`.
+    /// `src/traps/mod.rs:5`.
     pub source: String,
     pub lines: Vec<String>,
     /// The file the recipe lives in, for resolving relative links.
-    pub file: Option<usize>,
+    pub file: usize,
 }
 
-/// Every recipe in the crate: module doc sections first, then `.figure/howto` files.
+/// Every `# How to ...` section in the crate's module docs.
 pub fn collect(index: &Index) -> Vec<Recipe> {
     let mut out = Vec::new();
     for (fi, file) in index.files.iter().enumerate() {
@@ -31,50 +29,10 @@ pub fn collect(index: &Index) -> Vec<Recipe> {
                     title: s.title.clone(),
                     source: format!("{}:{line}", slash(&file.path)),
                     lines: s.lines,
-                    file: Some(fi),
+                    file: fi,
                 });
             }
         }
-    }
-    let dir = index.project.root.join(".figure").join("howto");
-    let mut md: Vec<_> = fs::read_dir(&dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .collect();
-    md.sort();
-    for path in md
-        .into_iter()
-        .filter(|p| p.extension().is_some_and(|e| e == "md"))
-    {
-        let Ok(text) = fs::read_to_string(&path) else {
-            continue;
-        };
-        let lines: Vec<String> = text.lines().map(str::to_string).collect();
-        let doc = parse_module_doc(&lines);
-        let rel = slash(path.strip_prefix(&index.project.root).unwrap_or(&path));
-        let (title, topic, body) = match doc
-            .sections
-            .iter()
-            .find_map(|s| s.recipe_topic().map(|t| (s, t)))
-        {
-            Some((s, t)) => (s.title.clone(), t, s.lines.clone()),
-            None => {
-                let stem = path
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().replace('-', " "))
-                    .unwrap_or_default();
-                (format!("How to {stem}"), stem, lines.clone())
-            }
-        };
-        out.push(Recipe {
-            topic,
-            title,
-            source: rel,
-            lines: body,
-            file: None,
-        });
     }
     out
 }
@@ -140,7 +98,7 @@ fn list(recipes: &[Recipe]) -> String {
 
 fn render(index: &Index, recipe: &Recipe, all: &[Recipe]) -> String {
     let topics: Vec<String> = all.iter().map(|r| r.topic.clone()).collect();
-    let file: Option<&FileIndex> = recipe.file.map(|f| &index.files[f]);
+    let file: Option<&FileIndex> = Some(&index.files[recipe.file]);
     let mut ok = 0;
     let mut broken = 0;
     let mut body = Vec::new();

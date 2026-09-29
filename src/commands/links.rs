@@ -22,7 +22,7 @@ pub enum Resolved {
     Broken,
 }
 
-/// Resolves a link written in `file` (or in a `.figure/howto` file when `file` is `None`).
+/// Resolves a link written in `file` (`None` for a bare name resolved from the crate root).
 /// `strict` treats unknown bare names as broken; used for recipes.
 pub fn resolve_link(
     index: &Index,

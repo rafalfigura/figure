@@ -34,37 +34,36 @@ is through the contract first.
 | `figure mcp` | Serves `map`, `deps`, `show`, `howto` and `check` as MCP tools on stdin/stdout (see [For agents](#for-agents)). |
 | `figure hook guard\|stop` | Answers a Claude Code hook: JSON on stdin, exit 2 with a message to block (see [For agents](#for-agents)). |
 
-`<path>` is a directory, a `.rs` file, or a module path (`crate::traps`, `traps::shared`).
-`<symbol>` is `Harm`, `Harm::new`, `traps::register` or `crate::traps::register`.
+`<path>` is a directory, a `.rs` file, or a module path (`crate::commands`, `commands::howto`).
+`<symbol>` is `Section`, `Section::recipe_topic`, `howto::collect` or `crate::howto::collect`.
 `--root <dir>` points at the crate when running from elsewhere. Exit codes: 0 ok,
 1 findings under `--strict`, 2 usage error.
 
-Example on the fixture crate in `examples/rust`:
+figure is run on itself. Abridged output of `figure map src/commands`:
 
 ```
-$ figure map src/traps
-MODULE        crate::traps   src/traps/  6 files · 199 lines · rust
-PURPOSE       Traps: environmental hazards that hurt whoever steps in.
-SHAPE         star: 2 parts -> shared/, no other sibling imports, no cycles
+$ figure map src/commands
+MODULE        crate::commands   src/commands/  7 files · 1450 lines · rust
+PURPOSE       One module per CLI command; each returns the text to print.
+SHAPE         star: 4 parts -> howto, links, no other sibling imports, no cycles
 
 TREE
-  saw      Saw Blade: a spinning blade running back and forth along a rail.
-  shared/  Building blocks several traps share. (3 files)
-  spikes   Pop-up Spikes: a floor plate whose spikes go down, rattle, then up on a cycle.
+  check  `figure check [path] [--strict] [--changed [REF]]`: documentation gaps and broken links, ...
+  deps   `figure deps <path> [--depth N] [--reverse]`: what a module depends on, or who depends on it.
+  howto  `figure howto [topic]`: list recipes, or print one with its links resolved.
+  ...
 
 PUBLIC API
-## mod.rs
-  struct TrapsPlugin   impl Plugin · [no doc]
-  fn register<C: Component + DeserializeOwned>(app: &mut App, name: &'static str)
-      Registers a YAML component type whose spec deserializes straight into `C`.
+## check.rs
+  struct Report
+      What `check` found.
+  fn run(index: &Index, scope: &ModPath, changes: Option<&ChangeSet>) -> Report
+      Checks module docs, public item docs and doc links under `scope`.
 ...
-RELATIONS  (bevy pack)
-  spikes::plugin     registers Spikes · observer build · system run.run_if(gameplay_running) (Update)
-...
-UNDOCUMENTED  6 of 13 public items in this module (list: figure check src/traps)
 ```
 
-Every command's output on that crate is in `examples/rust/expected/`.
+A small fixture crate with golden output for every command lives in
+[`examples/rust`](examples/rust/README.md).
 
 ## Documenting code for figure
 
@@ -81,17 +80,16 @@ Optional sections in a `//!` doc:
 
 | Heading | Used for |
 | --- | --- |
-| `# How to <task>` | a recipe, printed by `figure howto <task>` (`add a trap`, `use the solver`) |
+| `# How to <task>` | a recipe, printed by `figure howto <task>` (`add a command`, `add a language`) |
 | `# Invariants` | listed under CONTRACTS in `map` |
 | `# Data flow`, `# Gotchas`, anything else | listed in `map`, printed by `show <module>` |
 
-Links use rustdoc intra-doc syntax (``[`Harm`]``, ``[`crate::traps::register`]``) and are
+Links use rustdoc intra-doc syntax (``[`Section`]``, ``[`crate::docs::Section`]``) and are
 checked by `figure check`. In recipes a bare name must resolve inside the crate. The line
-`Example to copy: [`Spikes`]` also prints the example's file and size.
+`Example to copy: [`Section`]` also prints the example's file and size.
 `#[doc(hidden)]` marks an item as intentionally undocumented; figure skips it.
 
-Recipes that span several modules can live in `.figure/howto/<topic>.md`, where
-`[[src/app.rs]]` links a file and `[[howto:add a trap]]` another recipe.
+In a recipe, `[[src/app.rs]]` links a file and `[[howto:add a command]]` another recipe.
 
 ## Run it automatically
 
@@ -149,7 +147,7 @@ undocumented new API. Work left uncommitted before the session is not its to doc
 Only what cannot be inferred from the code:
 
 ```toml
-# A project's own registration call, shown as a relation: `spikes::plugin registers Spikes`.
+# A project's own registration call, shown as a relation: `plugin::build registers Widget`.
 [[relations]]
 call = "register::<$T>"
 name = "registers"
@@ -205,7 +203,7 @@ level deeper only when the level above cannot answer your question.
 2. Contracts. `figure show <symbol>` (or a module): signature, doc, fields, methods,
    who wires, uses and calls it. `figure howto <topic>` before adding anything; follow the recipe.
    Answers: what does it do, how do I call or extend it.
-3. Code. `show` names the item's lines (`src/traps/mod.rs:42-47`). Only when step 2 left a
+3. Code. `show` names the item's lines (`src/docs.rs:3-12`). Only when step 2 left a
    question the doc does not answer, or to edit it, read that range of the file, not the
    whole file.
 
