@@ -12,7 +12,8 @@
           "path": "plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
         }
-      ]
+      ],
+      "draft": true
     }
   }
 }

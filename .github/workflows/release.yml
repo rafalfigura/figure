@@ -1,14 +1,23 @@
 name: release
 
 # release-please keeps a "release PR" open on main (version bump + CHANGELOG, from
-# conventional commits). Merging it tags vX.Y.Z and creates the GitHub release; the
-# build job then attaches one figure-<target>.tar.gz (+ .sha256) per platform,
-# which install.sh downloads. Building here rather than on `release: published`
-# because releases created with GITHUB_TOKEN do not trigger other workflows.
+# conventional commits). Merging it makes release-please create a *draft* release; the
+# build jobs then compile figure for every platform, and only when all of them succeed
+# does `publish` attach the binaries and publish the release (which creates the tag).
+# install.sh downloads those binaries. Everything runs in this one workflow because
+# releases created with GITHUB_TOKEN do not trigger other workflows.
+#
+# Re-run for an existing tag (e.g. a release whose build failed): Actions -> release ->
+# Run workflow, with the tag.
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and release, e.g. v0.1.0"
+        required: true
 
 permissions:
   contents: write
@@ -20,6 +29,7 @@ jobs:
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
+      sha: ${{ steps.rp.outputs.sha }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@v4
@@ -29,9 +39,9 @@ jobs:
 
   build:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' || inputs.tag != '' }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
@@ -40,9 +50,10 @@ jobs:
           - { target: aarch64-apple-darwin, os: macos-latest }
     runs-on: ${{ matrix.os }}
     steps:
+      # A draft release has no tag yet, so build the release commit itself.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ needs.release-please.outputs.sha || inputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
       - name: Package
@@ -53,9 +64,27 @@ jobs:
           tar czf "$name.tar.gz" "$name"
           if command -v sha256sum >/dev/null; then sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
           else shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"; fi
-      - name: Upload to the release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: figure-${{ matrix.target }}
+          path: figure-${{ matrix.target }}.tar.gz*
+
+  publish:
+    needs: [release-please, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach binaries and publish
         run: |
-          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
-            "figure-${{ matrix.target }}.tar.gz" "figure-${{ matrix.target }}.tar.gz.sha256" --clobber
+          ls -l dist
+          # Manual re-run: no draft exists yet.
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --draft --title "$TAG" --generate-notes
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --draft=false
