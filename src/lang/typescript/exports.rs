@@ -1,10 +1,65 @@
-//! Re-exports: `export { a, b as c } from './x'` and `export * from './x'`.
+//! What a file exports. ESM `export` on a declaration is read where the declaration is; this
+//! module collects the other forms (`export { a }`, `module.exports = { a }`, `exports.a = a`)
+//! and decides, once, how visible every item and method ends up. Re-exports
+//! (`export { a } from './x'`, `export * from './x'`) become items of their own.
+
+use std::collections::HashMap;
 
 use tree_sitter::Node;
 
 use super::items::{Site, push};
 use super::syntax::{collapse, text};
-use crate::model::{FileIndex, ItemKind};
+use crate::model::{FileIndex, Item, ItemKind, Vis};
+
+/// Names a file exports somewhere other than at their declaration.
+#[derive(Default)]
+pub struct Exports {
+    names: Vec<String>,
+}
+
+impl Exports {
+    /// `name` is exported.
+    pub fn add(&mut self, name: &str) {
+        self.names.push(name.to_string());
+    }
+
+    /// The names of an `export { a, b as c }` clause: the local names are what get exported.
+    pub fn add_clause(&mut self, clause: Node, src: &str) {
+        let mut cursor = clause.walk();
+        for spec in clause.named_children(&mut cursor) {
+            if let Some(name) = spec.child_by_field_name("name") {
+                self.add(text(name, src));
+            }
+        }
+    }
+
+    /// Sets the final visibility: exported names are public, and a method is as visible as the
+    /// least visible of itself and its owner.
+    pub fn apply(&self, items: &mut [Item]) {
+        for item in items.iter_mut().filter(|i| i.owner.is_none()) {
+            if self.names.contains(&item.name) {
+                item.vis = Vis::Pub;
+            }
+        }
+        let owners: HashMap<String, Vis> = items
+            .iter()
+            .filter(|i| i.owner.is_none())
+            .map(|i| (i.name.clone(), i.vis))
+            .collect();
+        for item in items.iter_mut() {
+            let Some(owner) = &item.owner else { continue };
+            let owner_vis =
+                owners
+                    .get(owner)
+                    .copied()
+                    .unwrap_or(match self.names.contains(owner) {
+                        true => Vis::Pub,
+                        false => Vis::Private,
+                    });
+            item.vis = item.vis.min(owner_vis);
+        }
+    }
+}
 
 /// `export { a, b as c } from './x'` and `export * from './x'`: one item per exported name.
 pub fn re_export(node: Node, src: &str, out: &mut FileIndex, site: &Site) {

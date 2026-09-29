@@ -24,7 +24,7 @@ scripts/usage.py <project>                  # how agents read code there: figure
 
 ## Rules
 
-- Only `src/lang/` knows a language's syntax; everything else reads `model::FileIndex`.
+- Only `src/lang/` knows a language: its syntax, manifest, import rules and naming. Everything else reads `model::FileIndex` and asks `Index::adapter()`; `tests/architecture.rs` enforces it.
 - Output is plain text, complete (no truncation), stable order: golden tests diff it byte for byte.
 - Any output change updates `examples/rust/expected/` in the same commit.
 - Keep files under ~300 lines; document every file (`//!`) and pub item (`///`).

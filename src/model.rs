@@ -126,6 +126,9 @@ pub struct TestFn {
 pub struct PathRef {
     pub segments: Vec<String>,
     pub glob: bool,
+    /// `segments` are a module path below the source root (an adapter resolved a relative
+    /// import while parsing); otherwise they are as written in the source.
+    pub anchored: bool,
     pub line: usize,
     pub in_test: bool,
     /// The function the path appears in, if any.

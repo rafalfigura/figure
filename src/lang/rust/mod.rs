@@ -1,7 +1,9 @@
 //! The Rust adapter: tree-sitter-rust, module paths from the `src/` layout.
 
 mod items;
+mod project;
 mod refs;
+mod resolve;
 mod syntax;
 
 use std::path::{Component, Path};
@@ -9,7 +11,10 @@ use std::path::{Component, Path};
 use tree_sitter::Parser;
 
 use super::LanguageAdapter;
-use crate::model::{FileIndex, ModPath};
+use crate::index::Index;
+use crate::model::{FileIndex, ModPath, mod_display};
+use crate::project::{Config, Project};
+use crate::resolve::Target;
 
 /// The Rust language adapter.
 pub struct Rust;
@@ -29,6 +34,68 @@ impl LanguageAdapter for Rust {
             "static", "let", "mut", "async", "unsafe", "for", "dyn", "where", "self", "super",
             "Self",
         ]
+    }
+
+    fn manifest(&self) -> &'static str {
+        "Cargo.toml"
+    }
+
+    fn detect(&self, dir: &Path) -> bool {
+        project::detect(dir)
+    }
+
+    fn load_project(&self, root: &Path, config: Config) -> Result<Project, String> {
+        project::load(root, config)
+    }
+
+    fn defines_dir(&self, file_name: &str) -> bool {
+        file_name == "mod.rs"
+    }
+
+    fn resolve(&self, index: &Index, file: &FileIndex, segs: &[String], _anchored: bool) -> Target {
+        resolve::resolve(index, file, segs)
+    }
+
+    fn is_builtin(&self, name: &str) -> bool {
+        resolve::is_std(name)
+    }
+
+    fn module_name(&self, module: &[String]) -> String {
+        mod_display(module)
+    }
+
+    fn group_name(&self, group: &[String]) -> String {
+        if group.is_empty() {
+            "crate (root)".to_string()
+        } else {
+            group.join("::")
+        }
+    }
+
+    fn qualify(&self, owner: &str, name: &str) -> String {
+        format!("{owner}::{name}")
+    }
+
+    fn full_name(&self, module: &[String], qualified: &str) -> String {
+        format!("{}::{qualified}", mod_display(module))
+    }
+
+    fn split_query(&self, query: &str) -> Vec<String> {
+        query
+            .replace("::", "/")
+            .split('/')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn qualify_signature(&self, signature: &str, owner: &str, name: &str) -> String {
+        signature.replacen(&format!("fn {name}"), &format!("fn {owner}::{name}"), 1)
+    }
+
+    fn grep_types(&self) -> &'static [&'static str] {
+        &["rust"]
     }
 
     fn module_of(&self, rel: &Path) -> Option<ModPath> {

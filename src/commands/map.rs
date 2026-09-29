@@ -214,7 +214,7 @@ fn relations_section(index: &Index, scope: &[String], out: &mut Out) {
         return;
     }
     out.blank();
-    out.line(if index.project.bevy {
+    out.line(if index.project.has_pack("bevy") {
         "RELATIONS  (bevy pack)"
     } else {
         "RELATIONS"

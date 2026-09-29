@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
-use crate::lang;
-use crate::model::{FileIndex, ModPath};
+use crate::lang::{self, LanguageAdapter};
+use crate::model::{FileIndex, Item, ModPath};
 use crate::project::Project;
 
 /// The parsed crate: files, module tree and project settings.
@@ -29,15 +29,11 @@ impl Index {
             .ok_or_else(|| format!("no adapter for {}", project.language))?;
         let src = project.root.join(&project.source_dir);
         if !src.is_dir() {
-            let hint = if project.workspaces {
-                " (a workspace root: point --root at a package, e.g. packages/<name>)"
-            } else {
-                ""
-            };
             return Err(format!(
-                "no {}/ directory in {}{hint}",
+                "no {}/ directory in {}{}",
                 project.source_dir,
-                project.root.display()
+                project.root.display(),
+                project.hint
             ));
         }
         let mut found: Vec<(PathBuf, ModPath)> = Vec::new();
@@ -133,17 +129,11 @@ impl Index {
             .then(|| file.path.parent().map(Path::to_path_buf))?
     }
 
-    /// True for the file that stands for its directory: `mod.rs`, or `index.ts` and friends.
+    /// True for the file that stands for its directory: `mod.rs`, `index.ts`.
     fn defines_dir(&self, file: &FileIndex) -> bool {
-        let Some(name) = file.path.file_name().map(|n| n.to_string_lossy()) else {
-            return false;
-        };
-        match self.language {
-            "typescript" => name
-                .rsplit_once('.')
-                .is_some_and(|(stem, _)| stem == "index"),
-            _ => name == "mod.rs",
-        }
+        file.path
+            .file_name()
+            .is_some_and(|n| self.adapter().defines_dir(&n.to_string_lossy()))
     }
 
     /// Maps a file or directory on disk to its module.
@@ -183,66 +173,72 @@ impl Index {
         parts.join("/")
     }
 
-    fn is_typescript(&self) -> bool {
-        self.language == "typescript"
+    /// The language adapter that parsed this index.
+    pub fn adapter(&self) -> &'static dyn LanguageAdapter {
+        lang::adapter(self.language).expect("the index was built by a known adapter")
     }
 
-    /// Splits a user's symbol or module query into names: on `::`, and for TypeScript also
-    /// on `/` and `.` (`store/cart`, `Cart.add`).
+    /// Splits a user's symbol or module query into names (`store/cart`, `crate::a::b`).
     pub fn split_query(&self, query: &str) -> Vec<String> {
-        let query = query.replace("::", "/");
-        let separators: &[char] = if self.is_typescript() {
-            &['/', '.']
-        } else {
-            &['/']
-        };
-        query
-            .split(separators)
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect()
+        self.adapter().split_query(query)
     }
 
-    /// How output names a module: `crate::traps::shared` (Rust), `store/cart` (TypeScript).
+    /// How output names a module.
     pub fn mod_name(&self, module: &[String]) -> String {
-        match (self.is_typescript(), module.is_empty()) {
-            (true, true) => "(root)".to_string(),
-            (true, false) => module.join("/"),
-            (false, _) => crate::model::mod_display(module),
-        }
+        self.adapter().module_name(module)
     }
 
     /// How output names a group of modules in a dependency listing.
     pub fn group_name(&self, key: &[String]) -> String {
-        if self.is_typescript() {
-            self.mod_name(key)
-        } else {
-            crate::graph::key_name(key)
-        }
+        self.adapter().group_name(key)
     }
 
-    /// Unambiguous name of an item, module included: `crate::a::Type::method`, `a/Type.method`.
-    pub fn full_name(&self, module: &[String], item: &crate::model::Item) -> String {
-        if self.is_typescript() && !module.is_empty() {
-            format!("{}/{}", module.join("/"), self.qualified(item))
-        } else if self.is_typescript() {
-            self.qualified(item)
-        } else {
-            format!("{}::{}", self.mod_name(module), self.qualified(item))
-        }
-    }
-
-    /// `Type::method` (Rust), `Type.method` (TypeScript), the plain name for free items.
-    pub fn qualified(&self, item: &crate::model::Item) -> String {
+    /// An item's name after its owner, or the plain name for free items.
+    pub fn qualified(&self, item: &Item) -> String {
         match &item.owner {
-            Some(owner) if self.is_typescript() => format!("{owner}.{}", item.name),
-            _ => item.qualified_name(),
+            Some(owner) => self.adapter().qualify(owner, &item.name),
+            None => item.name.clone(),
         }
+    }
+
+    /// Unambiguous name of an item, module included.
+    pub fn full_name(&self, module: &[String], item: &Item) -> String {
+        self.adapter().full_name(module, &self.qualified(item))
     }
 }
 
 /// A path with `/` separators, for output.
 pub fn slash(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
+}
+
+/// An index of empty files, one per module path, for tests.
+#[cfg(test)]
+pub mod testing {
+    use super::*;
+    use crate::project::Config;
+
+    /// Files for the `/`-separated `modules` (`""` is the root) of a Rust project that depends
+    /// on `externals`.
+    pub fn index_of(modules: &[&str], externals: &[&str]) -> Index {
+        let files: Vec<FileIndex> = modules
+            .iter()
+            .map(|m| FileIndex {
+                module: m
+                    .split('/')
+                    .filter(|p| !p.is_empty())
+                    .map(String::from)
+                    .collect(),
+                ..FileIndex::default()
+            })
+            .collect();
+        let mut project = Project::new(".".as_ref(), "t".into(), "rust", Config::default());
+        project.externals = externals.iter().map(|e| e.to_string()).collect();
+        Index {
+            modules: files.iter().map(|f| f.module.clone()).collect(),
+            files,
+            project,
+            language: "rust",
+        }
+    }
 }

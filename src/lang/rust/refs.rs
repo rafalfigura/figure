@@ -54,6 +54,7 @@ fn visit(node: Node, src: &str, out: &mut FileIndex, st: &St) {
                     out.refs.push(PathRef {
                         segments,
                         glob,
+                        anchored: false,
                         line: line(node),
                         in_test: st.in_test,
                         owner: st.owner.clone(),
@@ -103,6 +104,7 @@ fn visit(node: Node, src: &str, out: &mut FileIndex, st: &St) {
                 out.refs.push(PathRef {
                     segments,
                     glob: false,
+                    anchored: false,
                     line: line(node),
                     in_test: st.in_test,
                     owner: st.owner.clone(),

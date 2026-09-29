@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::index::Index;
 use crate::model::ModPath;
-use crate::resolve::{Target, is_std, resolve};
+use crate::resolve::{Target, is_builtin, resolve_ref};
 
 /// One resolved reference from a file into a module of this crate.
 #[derive(Debug, Clone)]
@@ -34,14 +34,14 @@ impl Graph {
         };
         for (fi, file) in index.files.iter().enumerate() {
             for r in &file.refs {
-                match resolve(index, file, &r.segments) {
+                match resolve_ref(index, file, r) {
                     Target::Internal { module, symbol } if !r.in_test => graph.edges.push(Edge {
                         from: fi,
                         line: r.line,
                         target: module,
                         symbol: if r.glob { Some("*".into()) } else { symbol },
                     }),
-                    Target::External(name) if !is_std(&name) => {
+                    Target::External(name) if !is_builtin(index, &name) => {
                         let entry = graph.externals.entry(name).or_default();
                         if r.in_test {
                             entry.1.insert(fi);
@@ -109,15 +109,6 @@ impl Graph {
 pub fn group_key(module: &[String], scope: &[String], extra_depth: usize) -> ModPath {
     let common = module.iter().zip(scope).take_while(|(a, b)| a == b).count();
     module[..module.len().min(common + 1 + extra_depth)].to_vec()
-}
-
-/// Display name of a group key.
-pub fn key_name(key: &[String]) -> String {
-    if key.is_empty() {
-        "crate (root)".into()
-    } else {
-        key.join("::")
-    }
 }
 
 /// How the direct children of `scope` depend on each other.

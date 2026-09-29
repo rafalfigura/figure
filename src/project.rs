@@ -1,4 +1,5 @@
-//! The project being mapped: its `Cargo.toml` or `package.json` and the optional `figure.toml`.
+//! The project being mapped: what every language adapter reports about its package, and the
+//! optional `figure.toml`. Finding and reading the package manifest is the adapter's job.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -6,24 +7,49 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-/// A Cargo or npm package and its figure settings.
+use crate::aliases::Aliases;
+use crate::lang;
+
+/// A package (a Cargo crate, an npm package, ...) and its figure settings.
 pub struct Project {
-    /// Directory holding `Cargo.toml` or `package.json`.
+    /// Directory holding the package manifest.
     pub root: PathBuf,
     pub name: String,
-    /// Crate names usable in paths (`-` replaced by `_`), from every dependency table.
+    /// Names of the packages this one depends on, spelled the way source refers to them.
     pub externals: BTreeSet<String>,
-    /// The bevy relation pack is on when bevy is a dependency.
-    pub bevy: bool,
-    /// Id of the language adapter that reads the sources: `rust` or `typescript`.
+    /// Id of the language adapter that reads the sources.
     pub language: &'static str,
     /// Directory below `root` that holds the sources (`src`); empty when they start at `root`.
     pub source_dir: String,
-    /// A `package.json` with `workspaces`: a monorepo root, whose packages are separate projects.
-    pub workspaces: bool,
-    /// Import aliases (`tsconfig.json` `paths`, `package.json` `imports`).
-    pub aliases: crate::aliases::Aliases,
+    /// Import aliases the language configures (`tsconfig.json` `paths`).
+    pub aliases: Aliases,
+    /// Relation packs the manifest switches on (`bevy`).
+    pub packs: Vec<&'static str>,
+    /// Advice appended to the "no source directory" error (a monorepo root).
+    pub hint: String,
     pub config: Config,
+}
+
+impl Project {
+    /// A project with the defaults most adapters share; the adapter sets what differs.
+    pub fn new(root: &Path, name: String, language: &'static str, config: Config) -> Project {
+        Project {
+            root: root.to_path_buf(),
+            name,
+            externals: BTreeSet::new(),
+            language,
+            source_dir: "src".to_string(),
+            aliases: Aliases::default(),
+            packs: Vec::new(),
+            hint: String::new(),
+            config,
+        }
+    }
+
+    /// True when the manifest switched the relation pack `name` on.
+    pub fn has_pack(&self, name: &str) -> bool {
+        self.packs.contains(&name)
+    }
 }
 
 /// `figure.toml`: only what cannot be inferred from the code.
@@ -55,8 +81,7 @@ pub struct DocsConfig {
     pub fact_prefixes: Vec<String>,
 }
 
-/// The nearest directory at or above `start` whose `Cargo.toml` has a `[package]` or that
-/// has a `package.json`.
+/// The nearest directory at or above `start` that some language adapter recognises as a package.
 pub fn find_root(start: &Path) -> Option<PathBuf> {
     let start = start.canonicalize().ok()?;
     let mut dir = if start.is_file() {
@@ -65,128 +90,35 @@ pub fn find_root(start: &Path) -> Option<PathBuf> {
         start
     };
     loop {
-        if is_cargo_package(&dir) || dir.join("package.json").is_file() {
+        if lang::all().iter().any(|a| a.detect(&dir)) {
             return Some(dir);
         }
         dir = dir.parent()?.to_path_buf();
     }
 }
 
-fn is_cargo_package(dir: &Path) -> bool {
-    fs::read_to_string(dir.join("Cargo.toml"))
-        .ok()
-        .and_then(|s| s.parse::<toml::Table>().ok())
-        .is_some_and(|t| t.contains_key("package"))
+/// Names of the manifests figure looks for: `Cargo.toml or package.json`.
+pub fn manifest_names() -> String {
+    let names: Vec<&str> = lang::all().iter().map(|a| a.manifest()).collect();
+    names.join(" or ")
 }
 
-/// Reads `Cargo.toml` (or else `package.json`) and the optional `figure.toml` in `root`.
+/// Reads the manifest of the first adapter that recognises `root`, and the optional `figure.toml`.
 pub fn load(root: &Path) -> Result<Project, String> {
-    if !is_cargo_package(root) && root.join("package.json").is_file() {
-        return load_npm(root);
-    }
-    let manifest_path = root.join("Cargo.toml");
-    let manifest: toml::Table = fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?
-        .parse()
-        .map_err(|e| format!("cannot parse {}: {e}", manifest_path.display()))?;
-    let name = manifest
-        .get("package")
-        .and_then(|p| p.get("name"))
-        .and_then(|n| n.as_str())
-        .unwrap_or("crate")
-        .to_string();
-    let externals = dependency_names(&manifest);
-    let bevy = externals
+    let adapters = lang::all();
+    let adapter = adapters
         .iter()
-        .any(|d| d == "bevy" || d.starts_with("bevy_"));
-    Ok(Project {
-        root: root.to_path_buf(),
-        name,
-        externals,
-        bevy,
-        language: "rust",
-        source_dir: "src".into(),
-        aliases: Default::default(),
-        workspaces: false,
-        config: load_config(root)?,
-    })
+        .find(|a| a.detect(root))
+        .ok_or_else(|| format!("no {} in {}", manifest_names(), root.display()))?;
+    adapter.load_project(root, load_config(root)?)
 }
 
-/// Reads `package.json`: the package name and every dependency table.
-fn load_npm(root: &Path) -> Result<Project, String> {
-    let path = root.join("package.json");
-    let manifest: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(&path).map_err(|e| format!("cannot read {}: {e}", path.display()))?,
-    )
-    .map_err(|e| format!("cannot parse {}: {e}", path.display()))?;
-    let name = manifest["name"]
-        .as_str()
-        .or_else(|| root.file_name().and_then(|n| n.to_str()))
-        .unwrap_or("package")
-        .to_string();
-    let externals = [
-        "dependencies",
-        "devDependencies",
-        "peerDependencies",
-        "optionalDependencies",
-    ]
-    .iter()
-    .filter_map(|t| manifest[*t].as_object())
-    .flat_map(|t| t.keys().cloned())
-    .collect();
-    let config = load_config(root)?;
-    let source_dir = config
-        .source
-        .clone()
-        .unwrap_or_else(|| detect_source_dir(root));
-    Ok(Project {
-        root: root.to_path_buf(),
-        name,
-        externals,
-        bevy: false,
-        language: "typescript",
-        aliases: crate::aliases::Aliases::load(root, &manifest, &source_dir),
-        source_dir,
-        workspaces: !manifest["workspaces"].is_null(),
-        config,
-    })
-}
-
-/// `src`, `source` or `lib` when one exists, else the project root itself.
-fn detect_source_dir(root: &Path) -> String {
-    ["src", "source", "lib"]
-        .iter()
-        .find(|d| root.join(d).is_dir())
-        .map_or_else(String::new, |d| d.to_string())
-}
-
-fn load_config(root: &Path) -> Result<Config, String> {
+/// Reads `figure.toml` in `root`; the defaults when there is none.
+pub fn load_config(root: &Path) -> Result<Config, String> {
     let config_path = root.join("figure.toml");
     if !config_path.is_file() {
         return Ok(Config::default());
     }
     toml::from_str(&fs::read_to_string(&config_path).map_err(|e| e.to_string())?)
         .map_err(|e| format!("invalid {}: {e}", config_path.display()))
-}
-
-fn dependency_names(manifest: &toml::Table) -> BTreeSet<String> {
-    const TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
-    let mut tables: Vec<&toml::Table> = TABLES
-        .iter()
-        .filter_map(|t| manifest.get(*t).and_then(|v| v.as_table()))
-        .collect();
-    if let Some(targets) = manifest.get("target").and_then(|t| t.as_table()) {
-        for target in targets.values().filter_map(|t| t.as_table()) {
-            tables.extend(
-                TABLES
-                    .iter()
-                    .filter_map(|t| target.get(*t).and_then(|v| v.as_table())),
-            );
-        }
-    }
-    tables
-        .into_iter()
-        .flat_map(|t| t.keys())
-        .map(|k| k.replace('-', "_"))
-        .collect()
 }

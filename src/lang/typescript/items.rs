@@ -4,6 +4,7 @@
 use tree_sitter::Node;
 
 use super::class;
+use super::exports::Exports;
 use super::syntax::{JsDoc, declaration_text, jsdoc, line, shorten, start_after_decorators, text};
 use crate::model::{FileIndex, Item, ItemKind, Vis};
 
@@ -19,7 +20,7 @@ pub struct Site<'a> {
 pub fn walk(root: Node, src: &str, out: &mut FileIndex) {
     let mut pending: Option<JsDoc> = None;
     let mut seen_statement = false;
-    let mut exported_later = Vec::new();
+    let mut exports = Exports::default();
     let mut cursor = root.walk();
     for child in root.named_children(&mut cursor) {
         match child.kind() {
@@ -46,34 +47,11 @@ pub fn walk(root: Node, src: &str, out: &mut FileIndex) {
                 let doc = pending
                     .take()
                     .filter(|d| child.start_position().row <= d.end_row + 1);
-                statement(child, src, out, doc.as_ref(), &mut exported_later);
+                statement(child, src, out, doc.as_ref(), &mut exports);
             }
         }
     }
-    for item in out.items.iter_mut().filter(|i| i.owner.is_none()) {
-        if exported_later.contains(&item.name) {
-            item.vis = Vis::Pub;
-        }
-    }
-    // A method is as visible as the least visible of itself and its owner.
-    let owners: std::collections::HashMap<String, Vis> = out
-        .items
-        .iter()
-        .filter(|i| i.owner.is_none())
-        .map(|i| (i.name.clone(), i.vis))
-        .collect();
-    for item in out.items.iter_mut() {
-        let Some(owner) = &item.owner else { continue };
-        let owner_vis = owners
-            .get(owner)
-            .copied()
-            .unwrap_or(if exported_later.contains(owner) {
-                Vis::Pub
-            } else {
-                Vis::Private
-            });
-        item.vis = item.vis.min(owner_vis);
-    }
+    exports.apply(&mut out.items);
 }
 
 /// A leading comment documents the file when tagged so or when a blank line follows it.
@@ -93,7 +71,7 @@ fn statement(
     src: &str,
     out: &mut FileIndex,
     doc: Option<&JsDoc>,
-    exported_later: &mut Vec<String>,
+    exports: &mut Exports,
 ) {
     if node.kind() == "expression_statement" {
         let site = Site {
@@ -101,11 +79,11 @@ fn statement(
             vis: Vis::Pub,
             doc,
         };
-        return super::commonjs::statement(node, src, out, &site, exported_later);
+        return super::commonjs::statement(node, src, out, &site, exports);
     }
     if node.kind() != "export_statement" {
         if matches!(node.kind(), "lexical_declaration" | "variable_declaration") {
-            super::commonjs::declaration(node, src, exported_later);
+            super::commonjs::declaration(node, src, exports);
         }
         let site = Site {
             span: node,
@@ -130,12 +108,7 @@ fn statement(
         if clause.kind() != "export_clause" {
             continue;
         }
-        let mut inner = clause.walk();
-        for spec in clause.named_children(&mut inner) {
-            if let Some(name) = spec.child_by_field_name("name") {
-                exported_later.push(text(name, src).to_string());
-            }
-        }
+        exports.add_clause(clause, src);
     }
 }
 

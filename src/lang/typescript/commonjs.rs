@@ -2,13 +2,14 @@
 
 use tree_sitter::Node;
 
+use super::exports::Exports;
 use super::items::{Site, push};
 use super::syntax::{declaration_text, shorten, text};
 use crate::model::{FileIndex, ItemKind, Vis};
 
 /// Handles one top-level statement if it assigns to `module.exports` or `exports`. Names of
-/// local declarations exported by reference (`module.exports = { a, b }`) go to `later`.
-pub fn statement(node: Node, src: &str, out: &mut FileIndex, site: &Site, later: &mut Vec<String>) {
+/// local declarations exported by reference (`module.exports = { a, b }`) go to `exports`.
+pub fn statement(node: Node, src: &str, out: &mut FileIndex, site: &Site, exports: &mut Exports) {
     let Some(assign) = node
         .named_child(0)
         .filter(|a| a.kind() == "assignment_expression")
@@ -27,9 +28,9 @@ pub fn statement(node: Node, src: &str, out: &mut FileIndex, site: &Site, later:
         {
             inner = next;
         }
-        return assignment(node, inner, src, out, site, later);
+        return assignment(node, inner, src, out, site, exports);
     }
-    assignment(node, assign, src, out, site, later)
+    assignment(node, assign, src, out, site, exports)
 }
 
 /// One `left = right` assignment, `node` being the statement that holds it.
@@ -39,7 +40,7 @@ fn assignment(
     src: &str,
     out: &mut FileIndex,
     site: &Site,
-    later: &mut Vec<String>,
+    exports: &mut Exports,
 ) {
     let (Some(left), Some(right)) = (
         assign.child_by_field_name("left"),
@@ -60,10 +61,12 @@ fn assignment(
                             .filter(|v| v.kind() == "identifier"),
                         _ => None,
                     };
-                    later.extend(name.map(|n| text(n, src).to_string()));
+                    if let Some(n) = name {
+                        exports.add(text(n, src));
+                    }
                 }
             }
-            "identifier" => later.push(text(right, src).to_string()),
+            "identifier" => exports.add(text(right, src)),
             _ => define(node, right, src, out, site, "default", "module.exports"),
         },
         t => {
@@ -73,7 +76,7 @@ fn assignment(
                 .filter(|n| !n.is_empty() && !n.contains('.'));
             match (name, right.kind()) {
                 (Some(_), "identifier") if text(right, src) == name.unwrap_or_default() => {
-                    later.push(text(right, src).to_string());
+                    exports.add(text(right, src));
                 }
                 (Some(name), _) => define(node, right, src, out, site, name, t),
                 _ => method(node, right, left, src, out, site),
@@ -165,7 +168,7 @@ fn method(node: Node, value: Node, left: Node, src: &str, out: &mut FileIndex, s
 }
 
 /// `var app = exports = module.exports = {};`: the declared name is what the module exports.
-pub fn declaration(node: Node, src: &str, later: &mut Vec<String>) {
+pub fn declaration(node: Node, src: &str, exports: &mut Exports) {
     let mut cursor = node.walk();
     for decl in node.named_children(&mut cursor) {
         let (Some(name), Some(value)) = (
@@ -181,7 +184,7 @@ pub fn declaration(node: Node, src: &str, later: &mut Vec<String>) {
                 .map(|l| text(l, src).split_whitespace().collect())
                 .unwrap_or_default();
             if left == "exports" || left == "module.exports" {
-                later.push(text(name, src).to_string());
+                exports.add(text(name, src));
                 break;
             }
             let Some(next) = chain.child_by_field_name("right") else {
