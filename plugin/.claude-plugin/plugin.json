@@ -8,5 +8,10 @@
   },
   "repository": "https://github.com/rafalfigura/figure",
   "license": "MIT",
-  "keywords": ["rust", "code-map", "navigation", "documentation"]
+  "keywords": [
+    "rust",
+    "code-map",
+    "navigation",
+    "documentation"
+  ]
 }
