@@ -11,8 +11,12 @@ No AI, no network, no stored state: each command parses the files live (the whol
 ## Install
 
 ```sh
-cargo install --path .
+curl -fsSL https://raw.githubusercontent.com/rafalfigura/figure/main/install.sh | sh
 ```
+
+Installs the latest release binary (Linux and macOS, x86_64 and arm64) to `~/.local/bin`,
+after checking its sha256. `FIGURE_VERSION=v0.1.0` pins a version, `FIGURE_INSTALL_DIR`
+picks the directory. From source instead: `cargo install --git https://github.com/rafalfigura/figure`.
 
 ## Commands
 
@@ -162,7 +166,7 @@ labels such as `component`) switches on when `bevy` is a dependency in `Cargo.to
 ### Claude Code: install the plugin
 
 ```sh
-cargo install --path .                                 # the hooks and the MCP server run `figure`
+curl -fsSL https://raw.githubusercontent.com/rafalfigura/figure/main/install.sh | sh   # the hooks and the MCP server run `figure`
 claude plugin marketplace add rafalfigura/figure       # or a local checkout: /path/to/figure
 claude plugin install figure@figure                    # --scope project|local for one project
 ```

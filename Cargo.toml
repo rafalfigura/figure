@@ -5,6 +5,9 @@ edition = "2024"
 description = "Compact, extracted code maps for AI agents: module manifests, symbols, recipes and dependencies."
 license = "MIT"
 repository = "https://github.com/rafalfigura/figure"
+readme = "README.md"
+keywords = ["ai", "code-map", "agents", "cli", "rust"]
+rust-version = "1.85"
 # `examples/<language>/` holds fixture projects that figure is tested on, not cargo examples.
 autoexamples = false
 
