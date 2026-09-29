@@ -1,0 +1,21 @@
+MODULE        (root)   src/  5 files · 95 lines · typescript
+PURPOSE       Shop: a tiny cart library used to test figure on TypeScript.
+SHAPE         mesh: cycles store <-> ui
+
+TREE
+  store/  Storage: the cart and its item types. (3 files)
+  ui/     [no module doc] (1 file)
+
+PUBLIC API
+## index.ts
+  function main(): void
+      Builds a cart and prints it.
+  export { Cart } from './store/cart'
+  export * from './store/types'
+## store/index.ts
+  export { Cart } from './cart'
+
+DEPENDENCIES
+  external  react 1
+
+UNDOCUMENTED  none (12 public items)

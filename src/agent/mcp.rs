@@ -22,8 +22,8 @@ const PROTOCOL: &str = "2025-06-18";
 
 /// The reading order, sent as the server's instructions.
 pub const INSTRUCTIONS: &str = "\
-figure maps this Rust crate from its source and docs. Use its tools instead of Read, Grep, \
-cat, sed or grep to explore .rs files. Work top down and go one level deeper only when the \
+figure maps this project (a Rust crate or a TypeScript/JavaScript package) from its source and \
+docs. Use its tools instead of Read, Grep, cat, sed or grep to explore source files. Work top down and go one level deeper only when the \
 level above cannot answer your question:
 1. Connections. `map` a directory or module: purpose, tree, public API, relations. `deps`: \
 what it uses; with reverse, who uses it. Answers: where does this live, what talks to what, \
@@ -95,11 +95,11 @@ fn tools() -> Value {
     json!([
         tool(
             "map",
-            "Step 1, connections. Module manifest of a directory, .rs file or module path: \
+            "Step 1, connections. Module manifest of a directory, source file or module path: \
              purpose, shape, tree, public API with docs, relations, dependencies, contracts, \
              recipes. Start here in any module you have not mapped yet.",
             json!({
-                "path": string("A directory (src/traps), a .rs file, or a module path (crate::traps)."),
+                "path": string("A directory (src/traps), a source file, or a module path (crate::traps, or store/cart in TypeScript)."),
                 "depth": depth,
                 "fields": flag("Also list struct fields, enum variants and trait members."),
                 "private": flag("Also list private items."),
@@ -111,7 +111,7 @@ fn tools() -> Value {
             "Step 1, connections. What a module depends on, with file counts and symbols; with \
              reverse, who depends on it, with file:line. Use it to see what a change touches.",
             json!({
-                "path": string("A directory, a .rs file, or a module path."),
+                "path": string("A directory, a source file, or a module path."),
                 "depth": depth,
                 "reverse": flag("Who depends on the module instead of what it depends on."),
             }),

@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::graph::{self, Edge, Graph};
 use crate::index::{Index, slash};
-use crate::model::{ModPath, mod_display};
+use crate::model::ModPath;
 use crate::render::{Out, TreeNode, count, tree};
 
 /// Prints what `scope` depends on, or with `reverse`, who depends on it.
@@ -18,7 +18,7 @@ pub fn run(index: &Index, scope: &ModPath, depth: usize, reverse: bool) -> Strin
     let mut out = Out::default();
     out.line(format!(
         "{}  ({})   fan-out {fan_out} · fan-in {fan_in}",
-        mod_display(scope),
+        index.mod_name(scope),
         count(index.files_in(scope).count(), "file")
     ));
     if reverse {
@@ -102,7 +102,7 @@ fn children_overview(index: &Index, graph: &Graph, scope: &[String]) -> Vec<Tree
             }
             let mut list: Vec<(String, usize)> = counts
                 .into_iter()
-                .map(|(k, f)| (graph::key_name(&k), f.len()))
+                .map(|(k, f)| (index.group_name(&k), f.len()))
                 .collect();
             list.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
             let fan_in = groups(
@@ -171,7 +171,7 @@ fn level(
     for (key, group) in by_key {
         let files: BTreeSet<usize> = group.iter().map(|e| e.from).collect();
         let label = if parent.is_empty() {
-            graph::key_name(&key)
+            index.group_name(&key)
         } else {
             key.last().cloned().unwrap_or_default()
         };

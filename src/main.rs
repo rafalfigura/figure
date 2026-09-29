@@ -3,11 +3,13 @@
 //! Each command finds the crate, parses its sources live, prints plain text and exits.
 
 mod agent;
+mod aliases;
 mod changes;
 mod commands;
 mod docs;
 mod graph;
 mod index;
+mod jsonc;
 mod lang;
 mod model;
 mod project;
@@ -21,7 +23,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 use crate::index::Index;
-use crate::model::{ModPath, mod_display};
+use crate::model::ModPath;
 use crate::resolve::Found;
 
 #[derive(Parser)]
@@ -188,7 +190,7 @@ fn open(root: Option<&Path>, hint: Option<&str>) -> Result<Index, String> {
             .and_then(project::find_root)
             .or_else(|| project::find_root(Path::new("."))),
     }
-    .ok_or("no Cargo.toml with a [package] found (use --root)")?;
+    .ok_or("no Cargo.toml with a [package] or package.json found (use --root)")?;
     Index::build(project::load(&root)?)
 }
 
@@ -215,14 +217,13 @@ fn pick(index: &Index, query: &str) -> Result<Found, String> {
             let list: Vec<String> = many
                 .iter()
                 .map(|f| match f {
-                    Found::Module(m) => format!("  {}  module", mod_display(m)),
+                    Found::Module(m) => format!("  {}  module", index.mod_name(m)),
                     Found::Item { file, item } => {
                         let file = &index.files[*file];
                         let item = &file.items[*item];
                         format!(
-                            "  {}::{}  {}:{}",
-                            mod_display(&file.module),
-                            item.qualified_name(),
+                            "  {}  {}:{}",
+                            index.full_name(&file.module, item),
                             index::slash(&file.path),
                             item.decl_line
                         )

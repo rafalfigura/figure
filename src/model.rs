@@ -30,6 +30,10 @@ pub enum Vis {
 pub enum ItemKind {
     Fn,
     Struct,
+    /// A class (TypeScript / JavaScript).
+    Class,
+    /// An interface (TypeScript).
+    Interface,
     Enum,
     Union,
     Trait,
@@ -42,11 +46,13 @@ pub enum ItemKind {
 }
 
 impl ItemKind {
-    /// The Rust keyword for the kind: `fn`, `struct`, ...
+    /// The keyword for the kind: `fn`, `struct`, `class`, ...
     pub fn keyword(self) -> &'static str {
         match self {
             ItemKind::Fn => "fn",
             ItemKind::Struct => "struct",
+            ItemKind::Class => "class",
+            ItemKind::Interface => "interface",
             ItemKind::Enum => "enum",
             ItemKind::Union => "union",
             ItemKind::Trait => "trait",

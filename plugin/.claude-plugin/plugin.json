@@ -1,8 +1,8 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "figure",
-  "version": "0.1.0",
-  "description": "Explore Rust crates top down with figure: map, deps, show and howto as tools, raw source reads steered to them, and new public API documented before the agent stops.",
+  "version": "0.1.1",
+  "description": "Explore Rust and TypeScript/JavaScript projects top down with figure: map, deps, show and howto as tools, raw source reads steered to them, and new public API documented before the agent stops.",
   "author": {
     "name": "Rafał Figura"
   },

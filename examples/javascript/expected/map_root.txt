@@ -1,0 +1,19 @@
+MODULE        (root)   src/  4 files · 63 lines · typescript
+PURPOSE       Toolbox: a small JavaScript library that mixes ES modules and CommonJS.
+SHAPE         layered: 1 sibling imports, no cycles
+
+TREE
+  cjs/  [no module doc] (2 files)
+  esm/  [no module doc] (1 file)
+
+PUBLIC API
+## index.js
+  function run()
+      Runs both halves and returns the total.
+  export { slug } from './cjs/legacy.cjs'
+  export * from './esm/math.mjs'
+
+DEPENDENCIES
+  external  lodash 1
+
+UNDOCUMENTED  none (7 public items)

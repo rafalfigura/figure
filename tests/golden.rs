@@ -31,6 +31,29 @@ const RUST_CASES: &[(&str, &[&str])] = &[
     ("check_module", &["check", "src/traps/shared"]),
 ];
 
+const TYPESCRIPT_CASES: &[(&str, &[&str])] = &[
+    ("map_root", &["map", "src"]),
+    ("map_store", &["map", "src/store", "--fields", "--private"]),
+    ("map_file", &["map", "src/store/cart.ts"]),
+    ("show_class", &["show", "Cart"]),
+    ("show_method", &["show", "Cart.add"]),
+    ("show_module", &["show", "store/cart"]),
+    ("show_fn", &["show", "format"]),
+    ("deps", &["deps", "src/store"]),
+    ("deps_reverse", &["deps", "src/ui", "--reverse"]),
+    ("check", &["check"]),
+];
+
+const JAVASCRIPT_CASES: &[(&str, &[&str])] = &[
+    ("map_root", &["map", "src"]),
+    ("map_cjs", &["map", "src/cjs", "--private"]),
+    ("map_esm", &["map", "src/esm", "--fields"]),
+    ("show_fn", &["show", "double"]),
+    ("show_class", &["show", "Counter"]),
+    ("deps", &["deps", "src/esm", "--reverse"]),
+    ("check", &["check"]),
+];
+
 fn example(language: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("examples")
@@ -78,4 +101,16 @@ fn run_cases(language: &str, cases: &[(&str, &[&str])]) {
 #[test]
 fn rust() {
     run_cases("rust", RUST_CASES);
+}
+
+/// TypeScript is supported: every command matches its golden output on `examples/typescript`.
+#[test]
+fn typescript() {
+    run_cases("typescript", TYPESCRIPT_CASES);
+}
+
+/// JavaScript (ES modules and CommonJS) matches its golden output on `examples/javascript`.
+#[test]
+fn javascript() {
+    run_cases("javascript", JAVASCRIPT_CASES);
 }

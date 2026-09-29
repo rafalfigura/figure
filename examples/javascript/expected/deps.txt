@@ -1,0 +1,5 @@
+esm  (1 file)   fan-out 0 · fan-in 2
+├── (root)  1 file
+│     src/index.js:5  Counter, add
+└── cjs     1 file
+      src/cjs/legacy.cjs:5

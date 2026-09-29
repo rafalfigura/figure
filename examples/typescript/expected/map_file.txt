@@ -1,0 +1,21 @@
+MODULE        store/cart   src/store/cart.ts  1 file · 37 lines · typescript
+PURPOSE       The cart: items in, total out.
+
+PUBLIC API
+## cart.ts
+  class Cart implements Iterable<Item>   impl Iterable
+      Holds items until they are paid.
+  Cart.add(item: Item): void
+      Adds an item.
+  Cart.total(): number
+      Sum of all prices.
+  Cart.[Symbol.iterator](): Iterator<Item>
+      Iterates the items.
+  const summary = (cart: Cart, currency = DEFAULT_CURRENCY): string =>
+      Formats a cart for humans.
+
+DEPENDENCIES
+  internal  store/types 1 · ui 1
+  used by   (root) · store · ui
+
+UNDOCUMENTED  none (5 public items)

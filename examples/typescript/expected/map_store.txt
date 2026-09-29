@@ -1,0 +1,47 @@
+MODULE        store   src/store/  3 files · 65 lines · typescript
+PURPOSE       Storage: the cart and its item types.
+SHAPE         layered: 1 sibling imports, no cycles
+
+TREE
+  cart   The cart: items in, total out.
+  types  Item and price types shared by the store.
+
+PUBLIC API
+## cart.ts
+  class Cart implements Iterable<Item>   impl Iterable
+      Holds items until they are paid.
+      · status: Status
+      · private items: Item[]
+  Cart.add(item: Item): void
+      Adds an item.
+  Cart.total(): number
+      Sum of all prices.
+  private Cart.sum(): number   [no doc]
+  Cart.[Symbol.iterator](): Iterator<Item>
+      Iterates the items.
+  const summary = (cart: Cart, currency = DEFAULT_CURRENCY): string =>
+      Formats a cart for humans.
+  function unexported()   [no doc]
+## index.ts
+  export { Cart } from './cart'
+## types.ts
+  interface Item
+      A purchasable thing.
+      · id: string
+      · price: number
+      · label?: string
+      · describe(): string
+  type Currency = 'EUR' | 'USD'
+      Where a price is counted.
+  enum Status
+      Cart states.
+      · Open
+      · Paid
+  const DEFAULT_CURRENCY: Currency = 'EUR'
+      Default currency.
+
+DEPENDENCIES
+  internal  ui 1
+  used by   (root) · ui
+
+UNDOCUMENTED  none (9 public items)

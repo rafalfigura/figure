@@ -1,0 +1,13 @@
+Cart  class · impl Iterable · store/cart · src/store/cart.ts:8-31
+signature     class Cart implements Iterable<Item>
+doc
+  Holds items until they are paid.
+fields
+  status: Status
+  private items: Item[]
+methods
+  Cart.add(item: Item): void
+  Cart.total(): number
+  private Cart.sum(): number   [no doc]
+  Cart.[Symbol.iterator](): Iterator<Item>
+used by       src/index.ts:5 · src/ui/view.tsx:6

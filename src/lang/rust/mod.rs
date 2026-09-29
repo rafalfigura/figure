@@ -56,7 +56,7 @@ impl LanguageAdapter for Rust {
         Some(module)
     }
 
-    fn parse(&self, source: &str) -> FileIndex {
+    fn parse(&self, source: &str, _rel: &Path) -> FileIndex {
         let mut parser = Parser::new();
         parser
             .set_language(&tree_sitter_rust::LANGUAGE.into())
@@ -83,7 +83,7 @@ mod tests {
     use crate::model::{ItemKind, Vis};
 
     fn parse(src: &str) -> FileIndex {
-        Rust.parse(src)
+        Rust.parse(src, Path::new("lib.rs"))
     }
 
     /// `mod.rs`, `lib.rs`/`main.rs` and plain files map to the module they define.

@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::index::Index;
-use crate::lang::LanguageAdapter;
-use crate::lang::rust::Rust;
 use crate::model::{Item, ItemKind, Vis};
 
 /// Files changed since `base` (committed, staged, unstaged or untracked).
@@ -79,7 +77,7 @@ pub fn since(index: &Index, base: &str) -> Result<ChangeSet, String> {
             paths.insert(PathBuf::from(p));
         }
     }
-    let adapter = Rust;
+    let adapter = crate::lang::adapter(index.language).ok_or("no language adapter")?;
     let mut files = BTreeMap::new();
     for file in index.files.iter().filter(|f| paths.contains(&f.path)) {
         let spec = format!("{base}:./{}", crate::index::slash(&file.path));
@@ -87,7 +85,12 @@ pub fn since(index: &Index, base: &str) -> Result<ChangeSet, String> {
             Ok(source) => FileChange {
                 new_file: false,
                 base_items: adapter
-                    .parse(&source)
+                    .parse(
+                        &source,
+                        file.path
+                            .strip_prefix(&index.project.source_dir)
+                            .unwrap_or(&file.path),
+                    )
                     .items
                     .iter()
                     .filter(|i| i.vis >= Vis::Restricted && i.kind != ItemKind::Use)

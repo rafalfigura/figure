@@ -1,0 +1,5 @@
+format  fn · ui/view · src/ui/view.tsx:8-11
+signature     function format(amount: number, currency: string): string
+doc
+  Formats an amount with its currency.
+used by       src/store/cart.ts:6

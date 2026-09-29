@@ -1,0 +1,4 @@
+Cart.add  fn · store/cart · src/store/cart.ts:13-16
+signature     add(item: Item): void
+doc
+  Adds an item.

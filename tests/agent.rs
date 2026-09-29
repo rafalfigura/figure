@@ -297,3 +297,26 @@ fn mcp_session() {
     assert_eq!(replies[3]["result"]["isError"], true);
     assert_eq!(replies[4]["error"]["code"], -32601);
 }
+
+/// The guard also protects TypeScript packages: whole reads of a long `.ts` file are blocked
+/// with each item's lines, a `--type ts` grep for a symbol is redirected, a Rust-only glob passes.
+#[test]
+fn guard_covers_typescript() {
+    let dir = std::env::temp_dir().join(format!("figure-agent-{}-ts", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("package.json"), "{ \"name\": \"t\" }").unwrap();
+    let mut big = String::from("/** First. */\nexport function first() {\n}\n");
+    big.push_str(&"// filler\n".repeat(114));
+    big.push_str("/** Last. */\nexport function last() {\n  first();\n}\n");
+    fs::write(dir.join("src/big.ts"), big).unwrap();
+    let file = dir.join("src/big.ts");
+    let (code, msg) = guard(&dir, "Read", json!({ "file_path": file }));
+    assert_eq!(code, 2, "{msg}");
+    assert!(msg.contains("fn first 1-3"), "{msg}");
+    let (code, msg) = guard(&dir, "Grep", json!({ "pattern": "first", "type": "ts" }));
+    assert_eq!(code, 2, "{msg}");
+    assert!(msg.contains("figure show first"), "{msg}");
+    let (code, _) = guard(&dir, "Grep", json!({ "pattern": "first", "type": "rust" }));
+    assert_eq!(code, 0);
+}
