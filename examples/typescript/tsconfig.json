@@ -1,0 +1,7 @@
+{
+  // `@/x` names src/x
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+  }
+}

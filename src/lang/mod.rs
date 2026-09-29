@@ -1,7 +1,7 @@
 //! Language adapters: the only code that knows a language's syntax.
 //!
 //! An adapter turns one source file into a [`FileIndex`]; everything after that is
-//! language-neutral. The MVP ships the Rust adapter only.
+//! language-neutral. Rust and TypeScript/JavaScript are supported.
 //!
 //! # How to add a language
 //! 1. Add `src/lang/<language>/` implementing [`LanguageAdapter`] on top of a tree-sitter
@@ -11,6 +11,7 @@
 //!    language is supported only when that suite passes.
 
 pub mod rust;
+pub mod typescript;
 
 use std::path::Path;
 
@@ -25,8 +26,9 @@ pub trait LanguageAdapter: Sync {
     /// The module a file defines, from its path relative to the source root.
     /// `None` for files that are not part of the module tree.
     fn module_of(&self, rel: &Path) -> Option<ModPath>;
-    /// Parses one file. `path` and `module` are filled in by the caller.
-    fn parse(&self, source: &str) -> FileIndex;
+    /// Parses one file. `rel` is its path below the source root (imports resolve against
+    /// it); `path` and `module` are filled in by the caller.
+    fn parse(&self, source: &str, rel: &Path) -> FileIndex;
     /// Words that can stand before a name in a code search (`fn`, `struct`, `impl`): the
     /// agent guard skips them when it decides whether a grep pattern names a symbol.
     fn keywords(&self) -> &'static [&'static str];
@@ -36,6 +38,7 @@ pub trait LanguageAdapter: Sync {
 pub fn adapter(id: &str) -> Option<&'static dyn LanguageAdapter> {
     match id {
         "rust" => Some(&rust::Rust),
+        "typescript" => Some(&typescript::TypeScript),
         _ => None,
     }
 }

@@ -36,6 +36,9 @@ fn resolve_in(index: &Index, file: &FileIndex, segs: &[String], follow_imports: 
     let Some(first) = segs.first() else {
         return Target::Other;
     };
+    if follow_imports && let Some(full) = index.project.aliases.expand(segs, &index.modules) {
+        return resolve_in(index, file, &full, false);
+    }
     let from = &file.module;
     let abs: ModPath = match first.as_str() {
         "crate" => segs[1..].to_vec(),
@@ -95,11 +98,7 @@ pub enum Found {
 /// Finds modules and items matching `query`: `Harm`, `Harm::new`, `shared::hazard`,
 /// `crate::traps::register`.
 pub fn find(index: &Index, query: &str) -> Vec<Found> {
-    let mut segs: Vec<String> = query
-        .split("::")
-        .map(|s| s.trim().trim_end_matches("()").to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
+    let mut segs = index.split_query(query.trim().trim_end_matches("()"));
     let anchored = segs.first().is_some_and(|s| s == "crate");
     if anchored {
         segs.remove(0);
@@ -203,6 +202,10 @@ mod tests {
                 name: "t".into(),
                 externals: BTreeSet::from(["bevy".to_string()]),
                 bevy: true,
+                language: "rust",
+                aliases: Default::default(),
+                workspaces: false,
+                source_dir: "src".into(),
                 config: Config::default(),
             },
             files,

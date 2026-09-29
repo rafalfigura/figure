@@ -225,3 +225,42 @@ fn changed_needs_git() {
     let bad = figure(&example(), &["check", "--changed", "no-such-ref"]);
     assert_eq!(bad.status.code(), Some(2));
 }
+
+/// A package's source directory is `src`, `source` or `lib` when one exists, else `figure.toml`'s
+/// `source`, else the package root.
+#[test]
+fn source_directory_detection() {
+    let make = |name: &str, files: &[(&str, &str)]| {
+        let dir = std::env::temp_dir().join(format!("figure-test-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("package.json"), "{ \"name\": \"p\" }").unwrap();
+        for (path, body) in files {
+            let path = dir.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, body).unwrap();
+        }
+        dir
+    };
+    let file = "/** Adds. */\nexport function add() {}\n";
+    let lib = make("js-lib", &[("lib/a.js", file)]);
+    let out = stdout(&figure(&lib, &["map", "lib"]));
+    assert!(out.contains("lib/") && out.contains("add()"), "{out}");
+    let custom = make(
+        "js-custom",
+        &[
+            ("lib/x.js", file),
+            ("app/a.js", file),
+            ("figure.toml", "source = \"app\"\n"),
+        ],
+    );
+    let out = stdout(&figure(&custom, &["map", "app"]));
+    assert!(out.contains("app/") && !out.contains("lib/x"), "{out}");
+    let root = make(
+        "js-root",
+        &[("a.js", file), ("node_modules/dep/i.js", file)],
+    );
+    let out = stdout(&figure(&root, &["map", "a.js"]));
+    assert!(out.contains("add()"), "{out}");
+    assert!(!stdout(&figure(&root, &["check"])).contains("node_modules"));
+}

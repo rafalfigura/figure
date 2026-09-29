@@ -7,8 +7,7 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
-use crate::lang::LanguageAdapter;
-use crate::lang::rust::Rust;
+use crate::lang;
 use crate::model::{FileIndex, ModPath};
 use crate::project::Project;
 
@@ -26,10 +25,20 @@ pub struct Index {
 impl Index {
     /// Finds and parses every source file of `project`.
     pub fn build(project: Project) -> Result<Index, String> {
-        let adapter = Rust;
-        let src = project.root.join("src");
+        let adapter = lang::adapter(project.language)
+            .ok_or_else(|| format!("no adapter for {}", project.language))?;
+        let src = project.root.join(&project.source_dir);
         if !src.is_dir() {
-            return Err(format!("no src/ directory in {}", project.root.display()));
+            let hint = if project.workspaces {
+                " (a workspace root: point --root at a package, e.g. packages/<name>)"
+            } else {
+                ""
+            };
+            return Err(format!(
+                "no {}/ directory in {}{hint}",
+                project.source_dir,
+                project.root.display()
+            ));
         }
         let mut found: Vec<(PathBuf, ModPath)> = Vec::new();
         for entry in ignore::WalkBuilder::new(&src).build().flatten() {
@@ -52,7 +61,8 @@ impl Index {
             .par_iter()
             .map(|(path, module)| {
                 let source = fs::read_to_string(path).unwrap_or_default();
-                let mut file = adapter.parse(&source);
+                let rel = path.strip_prefix(&src).unwrap_or(path);
+                let mut file = adapter.parse(&source, rel);
                 file.path = path.strip_prefix(&root).unwrap_or(path).to_path_buf();
                 file.module = module.clone();
                 file
@@ -93,13 +103,18 @@ impl Index {
     pub fn module_location(&self, module: &[String]) -> String {
         match self.root_file(module) {
             Some(f) if module.is_empty() => {
-                format!("{}/", slash(f.path.parent().unwrap_or(Path::new(""))))
+                let dir = slash(f.path.parent().unwrap_or(Path::new("")));
+                if dir.is_empty() {
+                    "./".to_string()
+                } else {
+                    format!("{dir}/")
+                }
             }
-            Some(f) if f.path.file_name().is_some_and(|n| n == "mod.rs") => {
+            Some(f) if self.defines_dir(f) => {
                 format!("{}/", slash(f.path.parent().unwrap_or(Path::new(""))))
             }
             Some(f) => slash(&f.path),
-            None => format!("src/{}/", module.join("/")),
+            None => format!("{}/", self.source_path(module)),
         }
     }
 
@@ -114,9 +129,21 @@ impl Index {
     /// Directory the module's files live in (`src/traps`, `src`), when it has one.
     pub fn module_dir(&self, module: &[String]) -> Option<PathBuf> {
         let file = self.root_file(module)?;
-        let name = file.path.file_name()?.to_string_lossy();
-        matches!(name.as_ref(), "mod.rs" | "main.rs" | "lib.rs")
+        (module.is_empty() || self.defines_dir(file))
             .then(|| file.path.parent().map(Path::to_path_buf))?
+    }
+
+    /// True for the file that stands for its directory: `mod.rs`, or `index.ts` and friends.
+    fn defines_dir(&self, file: &FileIndex) -> bool {
+        let Some(name) = file.path.file_name().map(|n| n.to_string_lossy()) else {
+            return false;
+        };
+        match self.language {
+            "typescript" => name
+                .rsplit_once('.')
+                .is_some_and(|(stem, _)| stem == "index"),
+            _ => name == "mod.rs",
+        }
     }
 
     /// Maps a file or directory on disk to its module.
@@ -131,7 +158,7 @@ impl Index {
                 .find(|f| f.path == rel)
                 .map(|f| f.module.clone());
         }
-        let under_src = rel.strip_prefix("src").ok()?;
+        let under_src = rel.strip_prefix(&self.project.source_dir).ok()?;
         let module: ModPath = under_src
             .components()
             .map(|c| c.as_os_str().to_string_lossy().into_owned())
@@ -139,17 +166,79 @@ impl Index {
         self.modules.contains(&module).then_some(module)
     }
 
-    /// Parses `crate::a::b`, `a::b` or `crate` into a known module.
+    /// Parses `crate::a::b`, `a::b` or `crate` (TypeScript: `a/b`, `a.b`) into a known module.
     pub fn module_named(&self, name: &str) -> Option<ModPath> {
-        let mut segs: Vec<String> = name
-            .split("::")
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect();
+        let mut segs = self.split_query(name);
         if segs.first().is_some_and(|s| s == "crate") {
             segs.remove(0);
         }
         self.modules.contains(&segs).then_some(segs)
+    }
+
+    /// `src/a/b`, or `a/b` when the sources start at the project root.
+    fn source_path(&self, module: &[String]) -> String {
+        let mut parts = vec![self.project.source_dir.clone()];
+        parts.extend(module.iter().cloned());
+        parts.retain(|p| !p.is_empty());
+        parts.join("/")
+    }
+
+    fn is_typescript(&self) -> bool {
+        self.language == "typescript"
+    }
+
+    /// Splits a user's symbol or module query into names: on `::`, and for TypeScript also
+    /// on `/` and `.` (`store/cart`, `Cart.add`).
+    pub fn split_query(&self, query: &str) -> Vec<String> {
+        let query = query.replace("::", "/");
+        let separators: &[char] = if self.is_typescript() {
+            &['/', '.']
+        } else {
+            &['/']
+        };
+        query
+            .split(separators)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// How output names a module: `crate::traps::shared` (Rust), `store/cart` (TypeScript).
+    pub fn mod_name(&self, module: &[String]) -> String {
+        match (self.is_typescript(), module.is_empty()) {
+            (true, true) => "(root)".to_string(),
+            (true, false) => module.join("/"),
+            (false, _) => crate::model::mod_display(module),
+        }
+    }
+
+    /// How output names a group of modules in a dependency listing.
+    pub fn group_name(&self, key: &[String]) -> String {
+        if self.is_typescript() {
+            self.mod_name(key)
+        } else {
+            crate::graph::key_name(key)
+        }
+    }
+
+    /// Unambiguous name of an item, module included: `crate::a::Type::method`, `a/Type.method`.
+    pub fn full_name(&self, module: &[String], item: &crate::model::Item) -> String {
+        if self.is_typescript() && !module.is_empty() {
+            format!("{}/{}", module.join("/"), self.qualified(item))
+        } else if self.is_typescript() {
+            self.qualified(item)
+        } else {
+            format!("{}::{}", self.mod_name(module), self.qualified(item))
+        }
+    }
+
+    /// `Type::method` (Rust), `Type.method` (TypeScript), the plain name for free items.
+    pub fn qualified(&self, item: &crate::model::Item) -> String {
+        match &item.owner {
+            Some(owner) if self.is_typescript() => format!("{owner}.{}", item.name),
+            _ => item.qualified_name(),
+        }
     }
 }
 

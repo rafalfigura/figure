@@ -115,8 +115,17 @@ pub fn count(n: usize, noun: &str) -> String {
 pub fn item_line(index: &Index, file: &crate::model::FileIndex, item: &Item) -> String {
     let mut sig = item.signature.clone();
     if let Some(owner) = &item.owner {
-        let needle = format!("fn {}", item.name);
-        sig = sig.replacen(&needle, &format!("fn {owner}::{}", item.name), 1);
+        if index.language == "typescript" {
+            let at = [format!("{}(", item.name), format!("{}<", item.name)]
+                .iter()
+                .find_map(|needle| sig.find(needle.as_str()));
+            if let Some(at) = at {
+                sig.replace_range(at..at + item.name.len(), &index.qualified(item));
+            }
+        } else {
+            let needle = format!("fn {}", item.name);
+            sig = sig.replacen(&needle, &format!("fn {owner}::{}", item.name), 1);
+        }
     }
     let mut extras = relations::labels(index, file, item);
     if item.kind != crate::model::ItemKind::Use && !item.is_documented() {

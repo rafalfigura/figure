@@ -3,7 +3,7 @@
 use crate::docs::{self, parse_module_doc};
 use crate::graph::{self, Graph};
 use crate::index::{Index, slash};
-use crate::model::{ItemKind, ModPath, Vis, mod_display};
+use crate::model::{ItemKind, ModPath, Vis};
 use crate::relations;
 use crate::render::{Out, aligned, count, item_line};
 
@@ -29,7 +29,7 @@ pub fn run(index: &Index, scope: &ModPath, opts: &Options) -> String {
         "MODULE",
         format!(
             "{}   {}  {} · {lines} lines · {}",
-            mod_display(scope),
+            index.mod_name(scope),
             index.module_location(scope),
             count(files.len(), "file"),
             index.language
@@ -70,7 +70,7 @@ pub fn run(index: &Index, scope: &ModPath, opts: &Options) -> String {
             format!(
                 "{}   (figure show {})",
                 other.join(" · "),
-                mod_display(scope)
+                index.mod_name(scope)
             ),
         );
     }
@@ -237,6 +237,7 @@ fn relations_section(index: &Index, scope: &[String], out: &mut Out) {
 
 fn deps_section(index: &Index, graph: &Graph, scope: &[String], out: &mut Out) {
     let mut outgoing: Vec<(String, usize)> = group_counts(
+        index,
         graph
             .outgoing(index, scope)
             .iter()
@@ -244,12 +245,15 @@ fn deps_section(index: &Index, graph: &Graph, scope: &[String], out: &mut Out) {
     );
     outgoing.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     let externals = graph.externals_in(index, scope);
-    let users: Vec<(String, usize)> = group_counts(graph.incoming(index, scope).iter().map(|e| {
-        (
-            graph::group_key(&index.files[e.from].module, scope, 0),
-            e.from,
-        )
-    }));
+    let users: Vec<(String, usize)> = group_counts(
+        index,
+        graph.incoming(index, scope).iter().map(|e| {
+            (
+                graph::group_key(&index.files[e.from].module, scope, 0),
+                e.from,
+            )
+        }),
+    );
     if outgoing.is_empty() && externals.is_empty() && users.is_empty() {
         return;
     }
@@ -279,14 +283,17 @@ fn deps_section(index: &Index, graph: &Graph, scope: &[String], out: &mut Out) {
 }
 
 /// (group, file) pairs -> (group name, distinct files).
-fn group_counts(pairs: impl Iterator<Item = (ModPath, usize)>) -> Vec<(String, usize)> {
+fn group_counts(
+    index: &Index,
+    pairs: impl Iterator<Item = (ModPath, usize)>,
+) -> Vec<(String, usize)> {
     let mut map: std::collections::BTreeMap<ModPath, std::collections::BTreeSet<usize>> =
         Default::default();
     for (k, f) in pairs {
         map.entry(k).or_default().insert(f);
     }
     map.into_iter()
-        .map(|(k, s)| (graph::key_name(&k), s.len()))
+        .map(|(k, s)| (index.group_name(&k), s.len()))
         .collect()
 }
 

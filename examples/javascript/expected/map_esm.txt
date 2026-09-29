@@ -1,0 +1,20 @@
+MODULE        esm   src/esm/  1 file · 18 lines · typescript
+PURPOSE       [no module doc]
+
+TREE
+  math  Math helpers written as an ES module.
+
+PUBLIC API
+## math.mjs
+  const add = (a, b) =>
+      Adds two numbers.
+  class Counter
+      Counts things.
+      · count
+  Counter.bump()
+      Increments and returns the count.
+
+DEPENDENCIES
+  used by   (root) · cjs
+
+UNDOCUMENTED  none (3 public items)

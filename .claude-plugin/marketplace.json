@@ -1,6 +1,6 @@
 {
   "name": "figure",
-  "description": "figure, compact code maps of Rust crates for AI agents.",
+  "description": "figure, compact code maps of Rust and TypeScript/JavaScript projects for AI agents.",
   "owner": {
     "name": "Rafał Figura"
   },
@@ -8,7 +8,7 @@
     {
       "name": "figure",
       "source": "./plugin",
-      "description": "Explore Rust crates top down with figure: MCP tools, a guard against raw source reads, and a documentation check before stopping."
+      "description": "Explore Rust and TypeScript/JavaScript projects top down with figure: MCP tools, a guard against raw source reads, and a documentation check before stopping."
     }
   ]
 }

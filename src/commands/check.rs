@@ -76,7 +76,7 @@ pub fn run(index: &Index, scope: &ModPath, changes: Option<&ChangeSet>) -> Repor
                         slash(&f.path),
                         i.decl_line,
                         i.kind.keyword(),
-                        i.qualified_name()
+                        index.qualified(i)
                     );
                     (name, i.is_documented())
                 })

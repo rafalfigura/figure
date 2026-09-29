@@ -1,0 +1,24 @@
+MODULE        cjs   src/cjs/  2 files · 28 lines · typescript
+PURPOSE       [no module doc]
+SHAPE         flat: 2 parts, no imports between them
+
+TREE
+  config  Configuration as a single exported class.
+  legacy  Older helpers written as a CommonJS module.
+
+PUBLIC API
+## config.cjs
+  module.exports = class Config
+      Settings read from the environment.
+## legacy.cjs
+  function double(n)
+      Doubles a number.
+  exports.slug = (title) =>
+      Lower-cases and dashes a title.
+  function hidden()   [no doc]
+
+DEPENDENCIES
+  internal  esm 1
+  used by   (root)
+
+UNDOCUMENTED  none (3 public items)

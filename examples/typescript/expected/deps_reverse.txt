@@ -1,0 +1,5 @@
+ui  (1 file)   fan-out 1 · fan-in 2
+├── (root)  1 file
+│     src/index.ts:6  render
+└── store   1 file
+      src/store/cart.ts:6  format

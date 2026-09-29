@@ -1,0 +1,4 @@
+double  fn · cjs/legacy · src/cjs/legacy.cjs:7-10
+signature     function double(n)
+doc
+  Doubles a number.

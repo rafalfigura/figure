@@ -7,7 +7,7 @@
 use crate::docs::parse_module_doc;
 use crate::graph::Graph;
 use crate::index::{Index, slash};
-use crate::model::{FileIndex, Item, ItemKind, ModPath, Owner, mod_display};
+use crate::model::{FileIndex, Item, ItemKind, ModPath, Owner};
 use crate::relations;
 use crate::render::{Out, count, item_line};
 use crate::resolve::{Found, Target, resolve};
@@ -29,9 +29,9 @@ fn item_manifest(index: &Index, file: &FileIndex, item: &Item) -> String {
     head.extend(relations::labels(index, file, item));
     out.line(format!(
         "{}  {} · {} · {}:{}-{}",
-        item.qualified_name(),
+        index.qualified(item),
         head.join(" · "),
-        mod_display(&file.module),
+        index.mod_name(&file.module),
         slash(&file.path),
         item.start_line,
         item.end_line
@@ -231,7 +231,7 @@ fn module(index: &Index, m: &ModPath) -> String {
     let files = index.files_in(m).count();
     out.line(format!(
         "{}  module · {} · {}",
-        mod_display(m),
+        index.mod_name(m),
         index.module_location(m),
         count(files, "file")
     ));

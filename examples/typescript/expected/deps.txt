@@ -1,0 +1,2 @@
+store  (3 files)   fan-out 1 · fan-in 2
+└── ui  1 file   format

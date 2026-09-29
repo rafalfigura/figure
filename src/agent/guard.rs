@@ -23,7 +23,7 @@ use super::pattern::symbol_search;
 use super::shell::{self, Simple};
 use crate::index::{Index, slash};
 use crate::model::{FileIndex, ItemKind};
-use crate::project;
+use crate::{lang, project};
 
 /// Whole-file reads of indexed files up to this many lines pass.
 pub const WHOLE_FILE_LINES: usize = 100;
@@ -59,13 +59,13 @@ pub fn judge(input: &Value) -> Option<String> {
         .ok()?;
     let relevant = match tool {
         "Read" => {
-            args["file_path"].as_str()?.ends_with(".rs")
+            is_source(args["file_path"].as_str()?)
                 && args["offset"].is_null()
                 && args["limit"].is_null()
         }
         "Grep" => true,
         "Bash" => shell::commands(args["command"].as_str()?).iter().any(|c| {
-            let names_rs = c.args.iter().any(|a| a.ends_with(".rs"));
+            let names_rs = c.args.iter().any(|a| is_source(a));
             (PAGERS.contains(&c.program.as_str()) || c.program == "sed") && names_rs
                 || GREPS.contains(&c.program.as_str()) && !c.piped
         }),
@@ -88,15 +88,22 @@ pub fn judge(input: &Value) -> Option<String> {
         }
         "Grep" => {
             let path = args["path"].as_str().unwrap_or(".");
-            let not_rust = args["glob"].as_str().is_some_and(|g| !g.contains("rs"))
-                || args["type"].as_str().is_some_and(|t| t != "rust");
-            (!not_rust && at.covers(path))
+            let other_language = args["glob"].as_str().is_some_and(|g| !at.names_language(g))
+                || args["type"].as_str().is_some_and(|t| !at.is_type(t));
+            (!other_language && at.covers(path))
                 .then(|| symbol_search(&at, args["pattern"].as_str()?, "Grep"))?
         }
         _ => shell::commands(args["command"].as_str()?)
             .iter()
             .find_map(|c| bash(&at, c)),
     }
+}
+
+/// True when `arg` ends in the extension of a language figure reads.
+fn is_source(arg: &str) -> bool {
+    ["rs", "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"]
+        .iter()
+        .any(|e| arg.ends_with(&format!(".{e}")))
 }
 
 /// The crate and where the agent stands.
@@ -129,6 +136,23 @@ impl Place<'_> {
     }
 
     /// True when `arg` is an indexed file or a directory holding some.
+    /// True when a glob or option value names files of the project's language.
+    fn names_language(&self, glob: &str) -> bool {
+        lang::adapter(self.index.language)
+            .is_some_and(|a| a.extensions().iter().any(|e| glob.contains(e)))
+    }
+
+    /// True when a ripgrep `--type` covers the project's language.
+    fn is_type(&self, name: &str) -> bool {
+        match self.index.language {
+            "typescript" => matches!(
+                name,
+                "ts" | "js" | "typescript" | "javascript" | "tsx" | "jsx"
+            ),
+            language => name == language,
+        }
+    }
+
     fn covers(&self, arg: &str) -> bool {
         self.rel(arg)
             .is_some_and(|rel| self.index.files.iter().any(|f| f.path.starts_with(&rel)))
@@ -172,16 +196,16 @@ fn bash(at: &Place, cmd: &Simple) -> Option<String> {
             || short('r')
             || short('R')
             || cmd.args.iter().any(|a| a == "--recursive");
-        let rust_only = !cmd.args.iter().any(|a| {
+        let own_language = !cmd.args.iter().any(|a| {
             (a.starts_with("--include") || a.starts_with("--glob") || a.starts_with("-g"))
-                && !a.contains("rs")
+                && !at.names_language(a)
         });
         let in_crate = if paths.is_empty() {
             recursive && !cmd.piped && at.covers(".")
         } else {
             paths.iter().any(|p| at.covers(p))
         };
-        return (in_crate && rust_only).then(|| symbol_search(at, &pattern?, program))?;
+        return (in_crate && own_language).then(|| symbol_search(at, &pattern?, program))?;
     }
     None
 }

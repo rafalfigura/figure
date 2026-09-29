@@ -1,0 +1,9 @@
+Counter  class · esm/math · src/esm/math.mjs:8-16
+signature     class Counter
+doc
+  Counts things.
+fields
+  count
+methods
+  Counter.bump()
+used by       src/index.js:5
