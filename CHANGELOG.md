@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/rafalfigura/figure/compare/v0.1.0...v0.1.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* fmt ([#3](https://github.com/rafalfigura/figure/issues/3)) ([f30afe2](https://github.com/rafalfigura/figure/commit/f30afe22e30422ddcab7262f091357a3eef863a7))
+
 ## 0.1.0 (2026-09-29)
 
 
