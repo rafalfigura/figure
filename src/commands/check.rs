@@ -1,7 +1,6 @@
 //! `figure check [path] [--strict] [--changed [REF]]`: documentation gaps and broken links,
 //! for the whole crate or only for what changed since a git revision.
 
-
 use crate::changes::ChangeSet;
 use crate::commands::howto;
 use crate::commands::links::{Resolved, resolve_link};
