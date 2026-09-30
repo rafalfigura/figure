@@ -255,7 +255,8 @@ fn stop_hook_ignores_untouched_files() {
 }
 
 /// One MCP session: handshake with instructions, five read-only tools, a call that returns
-/// the same text as the command, an error for a bad symbol, silence for notifications.
+/// the same text as the command, an error for a bad symbol, silence for notifications, and
+/// `out` answering as `howto`.
 #[test]
 fn mcp_session() {
     let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/rust");
@@ -266,6 +267,7 @@ fn mcp_session() {
         json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "show", "arguments": { "symbol": "Harm::new" } } }),
         json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": { "name": "show", "arguments": { "symbol": "Nope" } } }),
         json!({ "jsonrpc": "2.0", "id": 5, "method": "resources/list" }),
+        json!({ "jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": { "name": "out", "arguments": { "topic": "trap" } } }),
     ];
     let stdin: String = requests.iter().map(|r| format!("{r}\n")).collect();
     let (code, out, _) = piped(&example, &["mcp"], &stdin);
@@ -274,7 +276,7 @@ fn mcp_session() {
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
         .collect();
-    assert_eq!(replies.len(), 5, "no reply to the notification");
+    assert_eq!(replies.len(), 6, "no reply to the notification");
     assert_eq!(replies[0]["result"]["protocolVersion"], "2025-06-18");
     assert!(
         replies[0]["result"]["instructions"]
@@ -296,6 +298,8 @@ fn mcp_session() {
     );
     assert_eq!(replies[3]["result"]["isError"], true);
     assert_eq!(replies[4]["error"]["code"], -32601);
+    let recipe = fs::read_to_string(example.join("expected/howto_module_recipe.txt")).unwrap();
+    assert_eq!(replies[5]["result"]["content"][0]["text"], recipe.as_str());
 }
 
 /// The guard also protects TypeScript packages: whole reads of a long `.ts` file are blocked

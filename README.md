@@ -28,7 +28,7 @@ is through the contract first.
 | --- | --- |
 | `figure map <path>` | Module manifest: purpose, shape, tree, public API, relations, dependencies, contracts, recipes, undocumented count. `--depth N`, `--fields`, `--private`. |
 | `figure show <symbol>` | One item or module: its `file:start-end`, doc, signature, fields, methods, relations, who wires, uses and calls it. |
-| `figure howto [topic]` | Lists `# How to ...` recipes, or prints one with every link resolved to `file:line`. |
+| `figure howto [topic]` | Lists `# How to ...` recipes, or prints one with every link resolved to `file:line`. Alias: `figure out [topic]` (`figure out trap`). |
 | `figure deps <path>` | What a module depends on (tree with file counts and symbols); `--reverse` for who uses it, with `file:line`. |
 | `figure check [path]` | Files without a module doc, undocumented public items, broken doc links. `--strict` exits 1 on any. `--changed [REF]` checks only what changed since a git revision (default `HEAD`). |
 | `figure mcp` | Serves `map`, `deps`, `show`, `howto` and `check` as MCP tools on stdin/stdout (see [For agents](#for-agents)). |
@@ -80,7 +80,7 @@ Optional sections in a `//!` doc:
 
 | Heading | Used for |
 | --- | --- |
-| `# How to <task>` | a recipe, printed by `figure howto <task>` (`add a command`, `add a language`) |
+| `# How to <task>` | a recipe, printed by `figure howto <task>` or `figure out <task>` (`add a command`, `add a language`) |
 | `# Invariants` | listed under CONTRACTS in `map` |
 | `# Data flow`, `# Gotchas`, anything else | listed in `map`, printed by `show <module>` |
 
@@ -205,7 +205,7 @@ level deeper only when the level above cannot answer your question.
    `figure deps <dir>` (`--reverse`): what it uses and who uses it.
    Answers: where does this live, what talks to what, what does a change touch.
 2. Contracts. `figure show <symbol>` (or a module): signature, doc, fields, methods,
-   who wires, uses and calls it. `figure howto <topic>` before adding anything; follow the recipe.
+   who wires, uses and calls it. `figure howto <topic>` (or `figure out <topic>`) before adding anything; follow the recipe.
    Answers: what does it do, how do I call or extend it.
 3. Code. `show` names the item's lines (`src/docs.rs:3-12`). Only when step 2 left a
    question the doc does not answer, or to edit it, read that range of the file, not the

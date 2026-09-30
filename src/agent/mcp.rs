@@ -29,7 +29,7 @@ level above cannot answer your question:
 what it uses; with reverse, who uses it. Answers: where does this live, what talks to what, \
 what does a change touch.
 2. Contracts. `show` one item or module: signature, doc, fields, methods, who wires, uses \
-and calls it, and its file:start-end. `howto` before adding anything; follow the recipe.
+and calls it, and its file:start-end. `howto` (alias `out`) before adding anything; follow the recipe.
 3. Code. Only when the doc does not answer your question, or to edit the item: Read that \
 file:start-end range (offset and limit), never the whole file.
 Know the question before each call and stop when it is answered. Reading the code of more \
@@ -128,7 +128,8 @@ fn tools() -> Value {
         tool(
             "howto",
             "Step 2, contracts. Without a topic, lists the crate's `How to` recipes; with one, \
-             prints it with every link resolved to file:line. Check it before adding anything.",
+             prints it with every link resolved to file:line. Check it before adding anything. \
+             Also callable as `out`.",
             json!({ "topic": string("Words of the recipe topic, e.g. `add a trap`.") }),
             &[],
         ),
@@ -180,7 +181,7 @@ fn command_line(params: &Value, root: Option<&Path>) -> Option<Vec<String>> {
             }
         }
         "show" => argv.extend(s("symbol")),
-        "howto" => argv.extend(
+        "howto" | "out" => argv.extend(
             s("topic")
                 .iter()
                 .flat_map(|t| t.split_whitespace().map(str::to_string)),
