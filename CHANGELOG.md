@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/rafalfigura/figure/compare/v0.2.0...v0.3.0) (2026-09-30)
+
+
+### Features
+
+* figure out, an alias of figure howto ([983fe30](https://github.com/rafalfigura/figure/commit/983fe30ef38525f31b3ae58d63e3af398a1fc39d))
+
 ## [0.2.0](https://github.com/rafalfigura/figure/compare/v0.1.0...v0.2.0) (2026-09-29)
 
 
