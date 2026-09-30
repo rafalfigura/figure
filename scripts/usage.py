@@ -4,7 +4,7 @@
 Reads the session transcripts Claude Code keeps in ~/.claude/projects/<project>/*.jsonl and
 counts, per session, every way an agent looked at Rust source:
 
-  figure    figure map/show/deps/howto/check, from the shell or the MCP tools
+  figure    figure map/show/deps/howto/out/check, from the shell or the MCP tools
   ranged    Read of a .rs file with offset/limit (what `show`'s file:start-end is for)
   whole     Read of a whole .rs file
   shell     cat/head/tail/sed/grep/rg/less/nl on .rs files or src/
@@ -26,7 +26,7 @@ import os
 import re
 import sys
 
-FIGURE_SHELL = re.compile(r"(?:^|[\s;&|(])(?:figure|cargo run -q --)\s+(map|show|deps|howto|check)\b")
+FIGURE_SHELL = re.compile(r"(?:^|[\s;&|(])(?:figure|cargo run -q --)\s+(map|show|deps|howto|out|check)\b")
 RAW_SHELL = re.compile(r"(?:^|[\s;&|(])(cat|head|tail|sed|grep|rg|less|nl|bat)\s[^;&|]*?(\.rs\b|\bsrc/)")
 GUARD_MARK = "figure guard:"
 

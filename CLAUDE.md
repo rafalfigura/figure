@@ -7,6 +7,7 @@ figure: a Rust CLI that prints compact, extracted code maps for AI agents. See `
 ```
 cargo run -q -- map src            # purpose, tree, public API of every module
 cargo run -q -- howto              # recipes: add a command, add a language
+cargo run -q -- out <topic>        # the same, as `figure out add a command`
 cargo run -q -- show <symbol>      # one item, with its file:start-end; read only those lines
 ```
 

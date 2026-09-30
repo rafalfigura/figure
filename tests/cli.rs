@@ -78,6 +78,15 @@ fn renamed_symbol_breaks_recipe() {
     fs::remove_dir_all(dir).unwrap();
 }
 
+/// `figure out` is `figure howto`: same recipe, same text.
+#[test]
+fn out_is_howto() {
+    let howto = figure(&example(), &["howto", "trap"]);
+    let out = figure(&example(), &["out", "trap"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), stdout(&howto));
+}
+
 /// Unknown and ambiguous names exit 2 with the candidates listed.
 #[test]
 fn lookup_errors() {

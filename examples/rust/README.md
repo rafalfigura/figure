@@ -26,4 +26,5 @@ Try it by hand:
 figure map src/traps --root examples/rust
 figure show traps::register --root examples/rust
 figure howto "add a trap" --root examples/rust
+figure out trap --root examples/rust      # alias of howto; any words of the topic
 ```

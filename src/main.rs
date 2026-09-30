@@ -61,6 +61,7 @@ enum Command {
         symbol: String,
     },
     /// List `# How to ...` recipes, or print one with its links checked.
+    #[command(visible_alias = "out")]
     Howto {
         /// Words of the recipe topic, e.g. `trap` or `add a trap`.
         topic: Vec<String>,
